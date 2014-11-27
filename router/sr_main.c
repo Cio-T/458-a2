@@ -35,6 +35,9 @@
 
 extern char* optarg;
 
+char *is_nat;
+int icmp_timeout, int tcp_estab, int tcp_idle; 
+
 /*-----------------------------------------------------------------------------
  *---------------------------------------------------------------------------*/
 
@@ -44,6 +47,9 @@ extern char* optarg;
 #define DEFAULT_SERVER "localhost"
 #define DEFAULT_RTABLE "rtable"
 #define DEFAULT_TOPO 0
+#define DEFAULT_ICMP_TIMEOUT 60
+#define DEFAULT_TCP_ESTABLISHED 7440
+#define DEFAULT_TCP_TRANSITORY 300
 
 static void usage(char* );
 static void sr_init_instance(struct sr_instance* );
@@ -66,10 +72,15 @@ int main(int argc, char **argv)
     unsigned int topo = DEFAULT_TOPO;
     char *logfile = 0;
     struct sr_instance sr;
+	
+	is_nat = 0;
+	icmp_timeout = DEFAULT_ICMP_TIMEOUT;
+	tcp_estab = DEFAULT_TCP_ESTABLISHED;
+	tcp_idle = DEFAULT_TCP_TRANSITORY; 
 
     printf("Using %s\n", VERSION_INFO);
 
-    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:")) != EOF)
+    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:n:I:E:R:")) != EOF)
     {
         switch (c)
         {
@@ -100,6 +111,18 @@ int main(int argc, char **argv)
                 break;
             case 'T':
                 template = optarg;
+                break;
+            case 'n':
+				is_nat = 1;
+                break;
+            case 'I':
+				icmp_timeout = atoi((char *) optarg);
+                break;
+            case 'E':
+                tcp_estab = atoi((char *) optarg);
+                break;
+            case 'R':
+                tcp_idle = atoi((char *) optarg);
                 break;
         } /* switch */
     } /* -- while -- */
