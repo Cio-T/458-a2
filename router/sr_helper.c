@@ -12,6 +12,87 @@
 #include "sr_utils.h"
 #include "sr_helper.h"
 
+
+int validIPPacket(struct sr_ip_hdr *ip_buf){
+    uint16_t calc_sum = calculate_IP_checksum(ip_buf);
+
+    if (ip_buf->ip_v != 4) {
+        printf("IP version is not 4\n");
+        return 0;
+    }
+    if (ip_buf->ip_hl < 4) {
+        printf("IP header length is %d\n", ip_buf->ip_hl);
+        return 0;
+    }
+    if (ntohl(ip_buf->ip_len) < 5) {
+        printf("ERROR: Total length is less than IP header length + UDP header length");
+        return 0;
+    }
+    if (ip_buf->ip_sum != calc_sum){
+        /*Drop packet*/
+        printf("ERROR: checksum_ip=%d, checksum_calc = %d\n", ip_buf->ip_sum, calc_sum);
+        return 0;
+    }
+    return 1;
+}
+
+struct sr_rt* getBestRtEntry(struct sr_rt* routing_table, struct sr_ip_hdr *ip_buf){
+    struct sr_rt* best_rt_entry = (struct sr_rt*)NULL;
+    struct sr_rt* rt_walker = routing_table;
+    int longest_prefix_count = 0;
+    int count = 32;
+    uint32_t cmp_dest, cmp_entry;
+	cmp_dest = ip_buf->ip_dst;
+
+    /*find longest prefix match entry in routing table*/
+    while (rt_walker && longest_prefix_count < 32){
+        /*find longest bit match length*/
+        cmp_entry = rt_walker->dest.s_addr & rt_walker->mask.s_addr;
+        while (count > longest_prefix_count){
+            if ((cmp_entry ^ cmp_dest) == 0){
+                longest_prefix_count = count;
+                best_rt_entry = rt_walker;
+            } else {
+                cmp_dest = cmp_dest >> 1;
+                cmp_entry = cmp_entry >> 1;
+                --count;
+            }
+        }
+        rt_walker = rt_walker->next;
+        count = 32;
+    }
+    return best_rt_entry;
+}
+
+int packetIsToSelf(struct sr_instance* sr, uint8_t *buf, int isIP, char* if_name){
+	unsigned char *tmp_ptr;
+	struct sr_if* get_if;
+
+	if (isIP){
+        struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
+		get_if = sr->if_list;
+		while(get_if) {
+			if (ntohl(ip_buf->ip_dst) == ntohl(get_if->ip)){
+				printf("is ip packet to self\n");
+				return 1;
+			}else{
+				get_if = get_if->next;
+			}
+		}
+	} else{
+        struct sr_arp_hdr *arp_buf = (struct sr_arp_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
+		get_if = sr_get_interface(sr, if_name);
+		if (arp_buf->ar_tip == get_if->ip){
+			if (ntohs(arp_buf->ar_op) == arp_op_request){/*If the ARP packet is ARP request*/
+				tmp_ptr = get_if->addr;
+				prepARPPacket(buf, tmp_ptr);
+			}
+			return 1;
+		}
+	}
+    return 0;
+}
+
 void makeAndSendICMP(int len, uint8_t* packet, struct sr_instance* sr, const char* iface,
 		uint8_t icmp_type, uint8_t icmp_code){
 
@@ -20,7 +101,7 @@ void makeAndSendICMP(int len, uint8_t* packet, struct sr_instance* sr, const cha
 	uint8_t * buf;
 	buf = (uint8_t *)malloc(len); /*allocate new memory for buf*/
 	memcpy(buf, packet, ETHE_SIZE + IP_SIZE); /*copy the ethernet and ip headers*/
-	
+
 	print_hdrs(buf, len);
 
 	sr_ethernet_hdr_t *ethe_header = (sr_ethernet_hdr_t *)buf;
@@ -41,7 +122,7 @@ void makeAndSendICMP(int len, uint8_t* packet, struct sr_instance* sr, const cha
 	populateIP(ip_header, out_if->ip, len);
 	prepEthePacketFwd(buf, ((sr_ethernet_hdr_t *)packet)->ether_shost, out_if->addr);
 	ethe_header->ether_type = htons(ethertype_ip);
-	
+
 	printf("***********ICMP packet send back**************");
 	print_hdrs(buf, len);
 
@@ -114,7 +195,7 @@ void prepARPPacket(uint8_t *buf, unsigned char *dest_mac_addr){
 
 void prepEthePacketFwd(uint8_t * buf, uint8_t *dest_mac_addr, uint8_t* src_mac_addr){
 	sr_ethernet_hdr_t *ethe_header = (sr_ethernet_hdr_t *)buf;
-	
+
 	/*change the src and dest MAC address of buf (prepare to forward)*/
 	int i;
 	for (i=0; i<ETHER_ADDR_LEN; ++i){
@@ -153,7 +234,7 @@ void sendARPReq(int len, unsigned char* dest_mac_addr, uint32_t next_hop_ip,
 	struct sr_arp_hdr *arp_header = (struct sr_arp_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 	populateARP(arp_header, dest_mac_addr, next_hop_ip, out_if->addr, out_if->ip);
 
-	
+
 	if (sr_send_packet(sr, buf, len, iface) < 0)
 		printf("Error sending ARP request.");
 
