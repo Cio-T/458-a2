@@ -12,7 +12,6 @@ void makeAndSendArpReq(unsigned char* dest_mac_addr, uint32_t next_hop_ip,
 	struct sr_instance* sr, const char* iface);
 
 void makeIcmpEchoReply(uint8_t* buf, struct sr_if* out_if);
-uint8_t* makeIcmp(uint8_t* buf, struct sr_if* out_if, uint8_t icmp_type, uint8_t icmp_code);
 
 int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int size);
 void prepICMPPacket(struct sr_icmp_hdr*, int, int, int);
@@ -45,5 +44,5 @@ enum header_length {
 };
 
 enum packet_length {
-    LEN_ICMP = ETHE_SIZE + IP_SIZE + ICMP3_SIZE,
+    LEN_ICMP = ETHE_SIZE + IP_SIZE + ICMP3_SIZE + ICMP_DATA_SIZE,
 };

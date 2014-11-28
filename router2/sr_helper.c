@@ -31,32 +31,22 @@ void makeIcmpEchoReply(uint8_t* buf, struct sr_if* out_if){
 
 uint8_t* makeIcmp(uint8_t* buf, struct sr_if* out_if, uint8_t icmp_type, uint8_t icmp_code){
 	int len = LEN_ICMP;
+
 	uint8_t* new_pac = (uint8_t *)malloc(len);
-
-	sr_ethernet_hdr_t *ethe_header = (sr_ethernet_hdr_t *)new_pac;
-	ethe_header->ether_type = htons(ethertype_ip);
-
-	struct sr_ip_hdr *ip_hdr = (struct sr_ip_hdr *)(new_pac + ETHE_SIZE);
-	struct sr_ip_hdr *ip_hdr_buf = (struct sr_ip_hdr *)(buf + ETHE_SIZE);
+	struct sr_ip_hdr *ip_hdr = (struct sr_ip_hdr *)(buf + ETHE_SIZE);
+	struct sr_icmp_hdr * icmp_hdr = (struct sr_icmp_hdr*)(buf + ETHE_SIZE + IP_SIZE);
 	
-    	ip_hdr->ip_dst = ip_hdr_buf->ip_src;
+    	ip_hdr->ip_dst = ip_hdr->ip_src;
 	ip_hdr->ip_src = out_if->ip; /* source and destination address */
-    	ip_hdr->ip_p = ip_protocol_icmp;	/* protocol */
-    	ip_hdr->ip_hl = 5; /* header length */
-	ip_hdr->ip_v = 4; /*version*/
-    	ip_hdr->ip_tos = 0; /* type of service */
-    	ip_hdr->ip_len = htons(len - ETHE_SIZE); /* ip data length = total length - ETHE header length*/
+
     	ip_hdr->ip_ttl = 64;
 	ip_hdr->ip_off = 0;	/* fragment offset field */
 	ip_hdr->ip_id = get_ip_id(ip_hdr->ip_dst);
     	ip_hdr->ip_sum = calculate_IP_checksum(ip_hdr);
 
-	struct sr_icmp_t3_hdr *icmp_hdr = (struct sr_icmp_t3_hdr*)(new_pac + ETHE_SIZE + IP_SIZE);
-
-	icmp_hdr->icmp_type = icmp_type;
-	icmp_hdr->icmp_code = icmp_code;
-	memcpy(icmp_hdr->data, ip_hdr_buf, ICMP_DATA_SIZE);
-	icmp_hdr->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_hdr*)icmp_hdr, ICMP3_SIZE);
+	icmp_hdr->icmp_type = 0;
+	icmp_hdr->icmp_code = 0;
+	icmp_hdr->icmp_sum = calculate_ICMP_checksum(icmp_hdr, ICMP_SIZE);
 
 	return new_pac;
 }

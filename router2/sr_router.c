@@ -87,9 +87,10 @@ void sr_handlepacket(struct sr_instance* sr,
 	uint8_t *buf;
 	buf = (uint8_t *)malloc(len); /*allocate new memory for buf*/
 	memcpy(buf, packet, len); /*let buf be a deep copy of the ethernet packet received*/
+	int send_icmp = 0;	
+	/*print_hdrs(buf, len);*/
 
 	struct sr_if* in_if = sr_get_interface(sr, interface);
-	int send_icmp = 0;
 
     if (ethertype(buf) == ethertype_ip){/*If the ethernet packet received has protocol IP*/
 
@@ -100,8 +101,9 @@ void sr_handlepacket(struct sr_instance* sr,
         		printf("ERROR: Time to live has expired\n");
  		       /*send ICMP Time exceeded (type 11, code 0)*/
 				send_icmp = 1;
-				buf = makeIcmp(buf, in_if, 11, 0);
+
 			} else {
+			    /*caculate new ttl and header checksum*/
 				if (packetIsToSelf(sr, buf, 1)){
 					printf("IP packet is to self\n");
 					if (ip_buf->ip_p == ip_protocol_icmp) {
@@ -114,8 +116,8 @@ void sr_handlepacket(struct sr_instance* sr,
                             if (validateICMPChecksum(icmp_hdr, ICMP_SIZE)){
                                 printf("ICMP echo request --isValid\n");
                     	        /*if yes, send back ICMP reply (type 0)*/
-								send_icmp = 1;
 								makeIcmpEchoReply(buf, in_if);
+								send_icmp = 1;
                     	    }
 						}
 
@@ -124,7 +126,7 @@ void sr_handlepacket(struct sr_instance* sr,
 						/*IP packet containing a UDP or TCP payload.
 						Send ICMP Port unreachable (type 3, code 3)*/
 						send_icmp = 1;
-						buf = makeIcmp(buf, in_if, 3, 3);
+
 					}
 
 				} else {
@@ -134,7 +136,6 @@ void sr_handlepacket(struct sr_instance* sr,
             		if (!best_rt_entry){/*no matching entry in routing table*/
                 		/*send ICMP Destination net unreachable (type 3, code 0)*/
 						send_icmp = 1;
-						buf = makeIcmp(buf, in_if, 3, 0);
 	    	        }else{
 						prepIpFwd(ip_buf);
 						interface = best_rt_entry->interface;
@@ -148,14 +149,14 @@ void sr_handlepacket(struct sr_instance* sr,
 							prepEtheFwd(buf, next_hop_ip_lookup->mac, out_if->addr);
 							if (sr_send_packet(sr, buf, len, interface) < 0)
 								printf("Error forwarding IP packet.");
-    		            	
+
 							free(next_hop_ip_lookup);
     	    		    } else {
         	    			struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), next_hop_ip, buf,
 																			len, interface);
         	    	    	sr_handle_arpreq(sr, req);
    		    	        }
-	
+
     		        }
 		        }
 			}
@@ -168,8 +169,9 @@ void sr_handlepacket(struct sr_instance* sr,
  	          	sr_process_arpreply(sr, arp_buf->ar_sha, arp_buf->ar_sip);
    			} else if (ntohs(arp_buf->ar_op) == arp_op_request){/*If the ARP packet is ARP request*/
    	    	    /*Send ARP reply packet to the sender*/
+				arp_buf->ar_op = htons(arp_op_reply);
 				prepArpReply(buf);
-                prepEtheFwd(buf, arp_buf->ar_tha, in_if->addr);
+				prepEtheFwd(buf, arp_buf->ar_tha, in_if->addr);
 				if (sr_send_packet(sr, buf, len, interface) < 0)
 					printf("Error sending ARP reply.");
 	     	} else {
@@ -180,11 +182,36 @@ void sr_handlepacket(struct sr_instance* sr,
 	    printf("Error: undefined ethernet type. Dropping packet.");
 	}
 
-	if (send_icmp){
-		printf("There is an icmp packet that needs to be sent.\n");
-	}
 	free(buf);
 }/* end sr_ForwardPacket */
+
+
+int packetIsToSelf(struct sr_instance* sr, uint8_t *buf, int isIP){
+	struct sr_if* get_if = sr->if_list;
+
+	if (isIP){
+        struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
+		while(get_if) {
+			if (ip_buf->ip_dst == get_if->ip){
+				printf("is ip packet to self\n");
+				return 1;
+			}else{
+				get_if = get_if->next;
+			}
+		}
+	} else{
+        struct sr_arp_hdr *arp_buf = (struct sr_arp_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
+		while(get_if) {
+			if (arp_buf->ar_tip == get_if->ip){
+				printf("is arp packet to self\n");
+				return 1;
+			}else{
+				get_if = get_if->next;
+			}
+		}
+	}
+    return 0;
+}
 
 int validIPPacket(struct sr_ip_hdr *ip_buf){
     uint16_t calc_sum = calculate_IP_checksum(ip_buf);
@@ -235,33 +262,6 @@ struct sr_rt* getBestRtEntry(struct sr_rt* routing_table, struct sr_ip_hdr *ip_b
         count = 32;
     }
     return best_rt_entry;
-}
-
-int packetIsToSelf(struct sr_instance* sr, uint8_t *buf, int isIP){
-	struct sr_if* get_if = sr->if_list;
-
-	if (isIP){
-        struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
-		while(get_if) {
-			if (ip_buf->ip_dst == get_if->ip){
-				printf("is ip packet to self\n");
-				return 1;
-			}else{
-				get_if = get_if->next;
-			}
-		}
-	} else{
-        struct sr_arp_hdr *arp_buf = (struct sr_arp_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
-		while(get_if) {
-			if (arp_buf->ar_tip == get_if->ip){
-				printf("is arp packet to self\n");
-				return 1;
-			}else{
-				get_if = get_if->next;
-			}
-		}
-	}
-    return 0;
 }
 
 int get_ip_id(uint32_t ip_dst){
