@@ -90,9 +90,6 @@ void sr_handlepacket(struct sr_instance* sr,
 
 	struct sr_if* in_if = sr_get_interface(sr, interface);
 
-    printf("size of tcp header is %d\n", TCP_SIZE);
-    printf("size of ip header is %d\n", IP_SIZE);
-    printf("size of icmp echo header is %d\n", ICMP_ECHO_SIZE);
     if (ethertype(buf) == ethertype_ip){/*If the ethernet packet received has protocol IP*/
         struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 
@@ -282,6 +279,11 @@ void nat_processbuf(struct sr_instance* sr,
 
 	if (strcmp(interface, "eth1") == 0 ){
         printf("nat from client\n");
+		if (ip_buf->ip_p == ip_protocol_tcp){
+
+        } else if (ip_buf->ip_p == ip_protocol_icmp) {
+
+        }
 	} else if (strcmp(interface, "eth2") == 0 ){
 	     printf("nat from server\n");
 	} else {

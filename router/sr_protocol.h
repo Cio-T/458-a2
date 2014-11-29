@@ -104,10 +104,7 @@ struct sr_tcp_hdr {
   uint16_t tcp_dest_port;
   uint32_t seq_num;
   uint32_t ack_num;
-
-  unsigned int tcp_offset;
-  unsigned char tcp_reserved[6];
-  unsigned char tcp_control[6];
+  uint16_t tcp_control;
   uint16_t advertise_window;
   uint16_t tcp_checksum;
   uint16_t urgent_pointer;
