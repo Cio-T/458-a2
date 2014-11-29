@@ -97,16 +97,15 @@ void sr_handlepacket(struct sr_instance* sr,
 
  		printf("Time to live is %d\n", ip_buf->ip_ttl);
 	    if (validIPPacket(ip_buf)){
-            if (sr->nat) {
-                nat_processbuf(sr, ip_buf, len);
-            }
 			if (ip_buf->ip_ttl < 2) {
         		printf("ERROR: Time to live has expired\n");
  		       /*send ICMP Time exceeded (type 11, code 0)*/
 				buf = makeIcmp(buf, in_if, 11, 0);
 				sendPacket(sr, buf, interface, LEN_ICMP);
 			} else {
-
+                if (sr->nat) {
+                    nat_processbuf(sr, ip_buf, len);
+                }
 				if (packetIsToSelf(sr, buf, 1)){
 					printf("IP packet is to self\n");
 					if (ip_buf->ip_p == ip_protocol_icmp) {
