@@ -64,16 +64,28 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
 
     time_t curtime = time(NULL);
     struct sr_nat_mapping *walker = nat->mappings;
-    struct sr_nat_mapping *prev = NULL;
+    struct sr_nat_mapping *prev_mapping = NULL;
     /* handle periodic tasks here */
 
     while (walker){
         if (walker->type == nat_mapping_icmp){
             if (difftime(curtime, walker->last_updated) > nat->icmp_timeout){
-                free_nat_mapping(walker, prev, nat);
+                free_nat_mapping(walker, prev_mapping, nat);
             }
         } else if (walker->type == nat_mapping_tcp){
+            struct sr_nat_connection *walker_conns = walker->conns;
+            struct sr_nat_connection *prev_conn;
 
+            while(walker_conns){
+                if (walker_conns->conn_state == syn){
+                    if (difftime(curtime, walker->last_updated) > nat->tcp_transitory){
+                        timeout_nat_conn(walker_conns, prev_conn, walker);
+                    }
+                }else{
+                }
+                prev_conn = walker_conns;
+                walker_conns = walker_conns->next;
+            }
         }
         prev = walker;
         walker = walker->next;
@@ -84,16 +96,28 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
   return NULL;
 }
 
-void free_nat_mapping(struct sr_nat_mapping * walker,
+void free_nat_mapping(struct sr_nat_mapping * mapping,
     struct sr_nat_mapping * prev, struct sr_nat *nat){
 
-        if (prev){
-            prev->next = walker->next;
-        } else {
-            nat->mappings = walker->next;
-        }
-
+    if (prev){
+        prev->next = mapping->next;
+    } else {
+        nat->mappings = mapping->next;
+    }
+    free(mapping);
 }
+
+void timeout_nat_conn(struct sr_nat_connection *conn,
+    struct sr_nat_connection * prev,
+    struct sr_nat_mapping *mapping){
+
+    if (prev){
+        prev->next = conn->next;
+    } else {
+        mapping->conns = conn->next;
+    }
+    free(conn);
+};
 
 /* Get the mapping associated with given external port.
    You must free the returned structure if it is not NULL. */

@@ -15,9 +15,10 @@ typedef enum {
 } sr_nat_mapping_type;
 
 typedef enum {
-  syn,
-  ack,
-  fin
+  SYN,
+  UN-SYN,
+  ACK,
+  FIN
   /* nat_mapping_udp, */
 } connection_state;
 
@@ -30,7 +31,7 @@ struct sr_nat_connection {
   uint32_t conn_ip; /* ip addr connected to*/
   uint16_t conn_aux; /* port # connected to*/
 
-  int conn;
+  int conn_state;
   struct sr_nat_connection *next;
 };
 
@@ -65,6 +66,8 @@ int   sr_nat_destroy(struct sr_nat *nat);  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *nat_ptr);  /* Periodic Timout */
 void free_nat_mapping(struct sr_nat_mapping *, struct sr_nat_mapping *,
     struct sr_nat *);
+void timeout_nat_conn(struct sr_nat_connection *, struct sr_nat_connection *,
+    struct sr_nat_mapping *);
 
 /* Get the mapping associated with given external port.
    You must free the returned structure if it is not NULL. */
