@@ -29,7 +29,9 @@ enum header_length {
     ARP_SIZE = sizeof(struct sr_arp_hdr),
     IP_SIZE =  sizeof(struct sr_ip_hdr),
     ICMP_SIZE = sizeof(struct sr_icmp_hdr),
+    ICMP_ECHO_SIZE = sizeof(struct sr_icmp_echo_hdr),
     ICMP3_SIZE = sizeof(struct sr_icmp_t3_hdr),
+    TCP_SIZE = sizeof(struct sr_tcp_hdr),
 };
 
 enum packet_length {
