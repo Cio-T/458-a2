@@ -6,6 +6,8 @@
 #include <time.h>
 #include <pthread.h>
 
+#include "sr_router.h"
+
 typedef enum {
   nat_mapping_icmp,
   nat_mapping_tcp
@@ -14,7 +16,7 @@ typedef enum {
 
 
 enum nat_mapping_size {
-    NAT_MAPPING_SIZE = sizeof(struct sr_nat_mapping *);
+    NAT_MAPPING_SIZE = sizeof(struct sr_nat_mapping *),
 };
 
 struct sr_nat_connection {
@@ -37,6 +39,9 @@ struct sr_nat_mapping {
 struct sr_nat {
   /* add any fields here */
   struct sr_nat_mapping *mappings;
+	int icmp_timeout;
+	int tcp_established;
+	int tcp_transitory; 
 
   /* threading */
   pthread_mutex_t lock;
@@ -46,7 +51,7 @@ struct sr_nat {
 };
 
 
-int   sr_nat_init(struct sr_nat *nat);     /* Initializes the nat */
+int   sr_nat_init(struct sr_instance*, int, int, int);     /* Initializes the nat */
 int   sr_nat_destroy(struct sr_nat *nat);  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *nat_ptr);  /* Periodic Timout */
 

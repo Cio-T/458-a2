@@ -81,15 +81,17 @@ void sr_handlepacket(struct sr_instance* sr,
   assert(interface);
 
   printf("*** -> Received packet of length %d \n",len);
-
-  /* fill in code here */
-
+	
 	uint8_t *buf;
 	buf = (uint8_t *)malloc(len); /*allocate new memory for buf*/
 	memcpy(buf, packet, len); /*let buf be a deep copy of the ethernet packet received*/
 
+  /* fill in code here */
+	if (sr->nat) {
+		nat_processbuf(sr, buf, len, interface);	
+	}
+
 	struct sr_if* in_if = sr_get_interface(sr, interface);
-	int send_icmp = 0;
 
     if (ethertype(buf) == ethertype_ip){/*If the ethernet packet received has protocol IP*/
 
@@ -99,8 +101,8 @@ void sr_handlepacket(struct sr_instance* sr,
 			if (ip_buf->ip_ttl < 2) {
         		printf("ERROR: Time to live has expired\n");
  		       /*send ICMP Time exceeded (type 11, code 0)*/
-				send_icmp = 1;
 				buf = makeIcmp(buf, in_if, 11, 0);
+				sendPacket(sr, buf, interface, LEN_ICMP);
 			} else {
 				if (packetIsToSelf(sr, buf, 1)){
 					printf("IP packet is to self\n");
@@ -114,8 +116,8 @@ void sr_handlepacket(struct sr_instance* sr,
                             if (validateICMPChecksum(icmp_hdr, ICMP_SIZE)){
                                 printf("ICMP echo request --isValid\n");
                     	        /*if yes, send back ICMP reply (type 0)*/
-								send_icmp = 1;
 								makeIcmpEchoReply(buf, in_if);
+								sendPacket(sr, buf, interface, len);
                     	    }
 						}
 
@@ -123,40 +125,14 @@ void sr_handlepacket(struct sr_instance* sr,
 					    printf("packet is to self and packet has TCP payload\n");
 						/*IP packet containing a UDP or TCP payload.
 						Send ICMP Port unreachable (type 3, code 3)*/
-						send_icmp = 1;
 						buf = makeIcmp(buf, in_if, 3, 3);
+						sendPacket(sr, buf, interface, LEN_ICMP);
 					}
 
 				} else {
-    		        /*Determine if packet should be forwarded*/
-        		    struct sr_rt* best_rt_entry = getBestRtEntry(sr->routing_table, ip_buf);
-
-            		if (!best_rt_entry){/*no matching entry in routing table*/
-                		/*send ICMP Destination net unreachable (type 3, code 0)*/
-						send_icmp = 1;
-						buf = makeIcmp(buf, in_if, 3, 0);
-	    	        }else{
 						prepIpFwd(ip_buf);
-						interface = best_rt_entry->interface;
-        	    	    /*find next hop ip address based on longest prefix match entry in rtable*/
-            	    	uint32_t next_hop_ip = best_rt_entry->gw.s_addr;
-  	  		            /*deal with ARP*/
-    	    	        struct sr_arpentry *next_hop_ip_lookup;
-            		    if ((next_hop_ip_lookup = sr_arpcache_lookup(&(sr->cache), next_hop_ip))){
-        	    	        /*Forward packet*/
-							struct sr_if* out_if = sr_get_interface(sr, interface);
-							prepEtheFwd(buf, next_hop_ip_lookup->mac, out_if->addr);
-							if (sr_send_packet(sr, buf, len, interface) < 0)
-								printf("Error forwarding IP packet.");
-    		            	
-							free(next_hop_ip_lookup);
-    	    		    } else {
-        	    			struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), next_hop_ip, buf,
-																			len, interface);
-        	    	    	sr_handle_arpreq(sr, req);
-   		    	        }
-	
-    		        }
+						sendPacket(sr, buf, interface, len);
+    		        /*Determine if packet should be forwarded*/
 		        }
 			}
 		}
@@ -180,9 +156,6 @@ void sr_handlepacket(struct sr_instance* sr,
 	    printf("Error: undefined ethernet type. Dropping packet.");
 	}
 
-	if (send_icmp){
-		printf("There is an icmp packet that needs to be sent.\n");
-	}
 	free(buf);
 }/* end sr_ForwardPacket */
 
@@ -285,4 +258,50 @@ int get_ip_id(uint32_t ip_dst){
 	this->next = next;
 	}
 	return 0;
+}
+
+void nat_processbuf(struct sr_instance* sr,
+        uint8_t * packet/* lent */,
+        unsigned int len,
+        char* interface/* lent */)
+{
+	struct sr_nat * nat = sr->nat;
+	printf("got -n flag sucessfully\n");
+	printf("got icmp timeout sucessfully: %d\n", nat->icmp_timeout);
+	printf("got tcp established timeout sucessfully: %d\n", nat->tcp_established);
+	printf("got tcp transitory timeout sucessfully: %d\n", nat->tcp_transitory);
+}
+
+void sendPacket(struct sr_instance* sr, uint8_t * buf, char * interface, unsigned int len){
+
+    struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
+	struct sr_if* in_if = sr_get_interface(sr, interface);
+
+        		    struct sr_rt* best_rt_entry = getBestRtEntry(sr->routing_table, ip_buf);
+
+            		if (!best_rt_entry){/*no matching entry in routing table*/
+                		/*send ICMP Destination net unreachable (type 3, code 0)*/
+						buf = makeIcmp(buf, in_if, 3, 0);
+						sendPacket(sr, buf, interface, LEN_ICMP);
+	    	        }else{
+						char* interface = best_rt_entry->interface;
+        	    	    /*find next hop ip address based on longest prefix match entry in rtable*/
+            	    	uint32_t next_hop_ip = best_rt_entry->gw.s_addr;
+  	  		            /*deal with ARP*/
+    	    	        struct sr_arpentry *next_hop_ip_lookup;
+            		    if ((next_hop_ip_lookup = sr_arpcache_lookup(&(sr->cache), next_hop_ip))){
+        	    	        /*Forward packet*/
+							struct sr_if* out_if = sr_get_interface(sr, interface);
+							prepEtheFwd(buf, next_hop_ip_lookup->mac, out_if->addr);
+							if (sr_send_packet(sr, buf, len, interface) < 0)
+								printf("Error forwarding IP packet.");
+    		            	
+							free(next_hop_ip_lookup);
+    	    		    } else {
+        	    			struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), next_hop_ip, buf,
+																			len, interface);
+        	    	    	sr_handle_arpreq(sr, req);
+   		    	        }
+	
+    		        }
 }

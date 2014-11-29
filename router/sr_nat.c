@@ -1,10 +1,21 @@
 
-#include <signal.h>
+#include <stdio.h>
 #include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+#include <signal.h>
 #include "sr_nat.h"
 #include <unistd.h>
 
-int sr_nat_init(struct sr_nat *nat) { /* Initializes the nat */
+int sr_nat_init(struct sr_instance* sr, int icmp_timeout, int tcp_established,
+	 int tcp_transitory) { /* Initializes the nat */
+	
+	struct sr_nat * nat;
+
+	if (sr->nat == 0){
+		sr->nat = (struct sr_nat *)malloc(sizeof(struct sr_nat));
+	} 
+	nat = sr->nat;
 
   assert(nat);
 
@@ -25,6 +36,9 @@ int sr_nat_init(struct sr_nat *nat) { /* Initializes the nat */
 
   nat->mappings = NULL;
   /* Initialize any variables here */
+		nat->icmp_timeout = icmp_timeout;
+		nat->tcp_established = tcp_established;
+		nat->tcp_transitory = tcp_transitory;
 
   return success;
 }
@@ -69,9 +83,10 @@ struct sr_nat_mapping *sr_nat_lookup_external(struct sr_nat *nat,
   struct sr_nat_mapping *walker = nat->mappings;
 
   while (walker){
-    if (walker->aux_ext == aux_ext && walker->type == type){
+    if (walker->type == type && walker->aux_ext == aux_ext){
         copy = malloc(NAT_MAPPING_SIZE);
         memcpy(copy, walker, NAT_MAPPING_SIZE);
+	break;
     }
     walker = walker->next;
   }
@@ -89,6 +104,16 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
 
   /* handle lookup here, malloc and assign to copy. */
   struct sr_nat_mapping *copy = NULL;
+  struct sr_nat_mapping *walker = nat->mappings;
+
+  while (walker){
+    if (walker->type == type && walker->ip_int == ip_int && walker->aux_int == aux_int){
+        copy = malloc(NAT_MAPPING_SIZE);
+        memcpy(copy, walker, NAT_MAPPING_SIZE);
+	break;
+    }
+    walker = walker->next;
+  }
 
   pthread_mutex_unlock(&(nat->lock));
   return copy;

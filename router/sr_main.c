@@ -31,11 +31,10 @@
 
 #include "sr_dumper.h"
 #include "sr_router.h"
+#include "sr_nat.h"
 #include "sr_rt.h"
 
 extern char* optarg;
-
-int is_nat, icmp_timeout, tcp_estab, tcp_idle; 
 
 /*-----------------------------------------------------------------------------
  *---------------------------------------------------------------------------*/
@@ -72,14 +71,14 @@ int main(int argc, char **argv)
     char *logfile = 0;
     struct sr_instance sr;
 	
-	is_nat = 0;
-	icmp_timeout = DEFAULT_ICMP_TIMEOUT;
-	tcp_estab = DEFAULT_TCP_ESTABLISHED;
-	tcp_idle = DEFAULT_TCP_TRANSITORY; 
+	int is_nat = 0;
+	int icmp_timeout = DEFAULT_ICMP_TIMEOUT;
+	int tcp_established = DEFAULT_TCP_ESTABLISHED;
+	int tcp_transitory = DEFAULT_TCP_TRANSITORY; 
 
     printf("Using %s\n", VERSION_INFO);
 
-    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:n:I:E:R:")) != EOF)
+    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:ns:I:E:R:")) != EOF)
     {
         switch (c)
         {
@@ -118,10 +117,10 @@ int main(int argc, char **argv)
 		icmp_timeout = atoi((char *) optarg);
                 break;
             case 'E':
-                tcp_estab = atoi((char *) optarg);
+                tcp_established = atoi((char *) optarg);
                 break;
             case 'R':
-                tcp_idle = atoi((char *) optarg);
+                tcp_transitory = atoi((char *) optarg);
                 break;
         } /* switch */
     } /* -- while -- */
@@ -178,6 +177,9 @@ int main(int argc, char **argv)
       sr_load_rt_wrap(&sr, rtable);
     }
 
+	if (is_nat){
+		sr_nat_init(&sr, icmp_timeout, tcp_established, tcp_transitory);
+	}
     /* call router init (for arp subsystem etc.) */
     sr_init(&sr);
 
@@ -196,11 +198,13 @@ int main(int argc, char **argv)
 
 static void usage(char* argv0)
 {
-    printf("Simple Router Client\n");
-    printf("Format: %s [-h] [-v host] [-s server] [-p port] \n",argv0);
+    printf("SR-NAT Client\n");
+    printf("Format: %s [-h] [-n] [-v host] [-s server] [-p port] \n",argv0);
     printf("           [-T template_name] [-u username] \n");
     printf("           [-t topo id] [-r routing table] \n");
-    printf("           [-l log file] \n");
+    printf("           [-l log file] [-I tcp timeout]\n");
+    printf("           [-E tcp established idle timeout]\n");
+    printf("           [-R tcp transitory idle timeout]\n");
     printf("   defaults server=%s port=%d host=%s  \n",
             DEFAULT_SERVER, DEFAULT_PORT, DEFAULT_HOST );
 } /* -- usage -- */
@@ -246,6 +250,10 @@ static void sr_destroy_instance(struct sr_instance* sr)
     {
         sr_dump_close(sr->logfile);
     }
+	if (sr->nat){
+		sr_nat_destroy(sr->nat);
+		free(sr->nat);
+	}
 
     /*
     fprintf(stderr,"sr_destroy_instance leaking memory\n");
@@ -270,6 +278,7 @@ static void sr_init_instance(struct sr_instance* sr)
     sr->topo_id = 0;
     sr->if_list = 0;
     sr->routing_table = 0;
+	sr->nat = 0;
     sr->logfile = 0;
 } /* -- sr_init_instance -- */
 
