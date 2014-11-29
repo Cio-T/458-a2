@@ -70,7 +70,7 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     while (walker){
         if (walker->type == nat_mapping_icmp){
             if (difftime(curtime, walker->last_updated) > nat->icmp_timeout){
-                free_nat_mapping(walker, prev, mat);
+                free_nat_mapping(walker, prev, nat);
             }
         } else if (walker->type == nat_mapping_tcp){
 
@@ -160,7 +160,7 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
     walker = walker->next;
   }
 
-  mapping = (struct sr_nat *)malloc(sizeof(struct sr_nat));
+  mapping = (struct sr_nat_mapping *)malloc(sizeof(struct sr_nat_mapping));
   mapping->type = type;
   mapping->conns = NULL;
   if (mapping->type == nat_mapping_tcp){
