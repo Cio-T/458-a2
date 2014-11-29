@@ -14,6 +14,12 @@ typedef enum {
   /* nat_mapping_udp, */
 } sr_nat_mapping_type;
 
+typedef enum {
+  syn,
+  ack,
+  fin
+  /* nat_mapping_udp, */
+} connection_state;
 
 enum nat_mapping_size {
     NAT_MAPPING_SIZE = sizeof(struct sr_nat_mapping *),
@@ -21,7 +27,10 @@ enum nat_mapping_size {
 
 struct sr_nat_connection {
   /* add TCP connection state data members here */
+  uint32_t conn_ip; /* ip addr connected to*/
+  uint16_t conn_aux; /* port # connected to*/
 
+  int conn;
   struct sr_nat_connection *next;
 };
 
