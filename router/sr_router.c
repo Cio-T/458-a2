@@ -283,7 +283,7 @@ void nat_processbuf(struct sr_instance* sr,
 	} else if (strcmp(interface, "eth2") == 0 ){
 	     printf("nat from server\n");
 	} else {
-	    printf("nat from unrecognized interface\n")
+	    printf("nat from unrecognized interface\n");
 	}
 }
 
