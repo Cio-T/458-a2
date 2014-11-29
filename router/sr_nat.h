@@ -16,7 +16,7 @@ typedef enum {
 
 typedef enum {
   SYN,
-  UN-SYN,
+  UN_SYN,
   ACK,
   FIN
   /* nat_mapping_udp, */
