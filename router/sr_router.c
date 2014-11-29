@@ -80,14 +80,13 @@ void sr_handlepacket(struct sr_instance* sr,
   assert(packet);
   assert(interface);
 
-  printf("*** -> Received packet of length %d \n",len);
+  printf("**** -> Received packet of length %d \n",len);
 
 	uint8_t *buf;
 	buf = (uint8_t *)malloc(len); /*allocate new memory for buf*/
 	memcpy(buf, packet, len); /*let buf be a deep copy of the ethernet packet received*/
 
   /* fill in code here */
-    print_hdrs(buf,len);
 
 	struct sr_if* in_if = sr_get_interface(sr, interface);
 
@@ -299,7 +298,6 @@ void sendPacket(struct sr_instance* sr, uint8_t * buf, char * interface, unsigne
         buf = makeIcmp(buf, in_if, 3, 0);
         sendPacket(sr, buf, interface, LEN_ICMP);
     }else{
-        printf("found best_rt_entry \n");
         char* interface = best_rt_entry->interface;
         /*find next hop ip address based on longest prefix match entry in rtable*/
         uint32_t next_hop_ip = best_rt_entry->gw.s_addr;
