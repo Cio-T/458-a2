@@ -71,23 +71,27 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
         if (walker->type == nat_mapping_icmp){
             if (difftime(curtime, walker->last_updated) > nat->icmp_timeout){
                 free_nat_mapping(walker, prev_mapping, nat);
+                walker = prev_mapping;
             }
         } else if (walker->type == nat_mapping_tcp){
             struct sr_nat_connection *walker_conns = walker->conns;
-            struct sr_nat_connection *prev_conn;
+            struct sr_nat_connection *prev_conn = NULL;
 
             while(walker_conns){
                 if (walker_conns->conn_state == UN_SYN){
                     if (difftime(curtime, walker->last_updated) > 6.0){
                         timeout_nat_conn(walker_conns, prev_conn, walker);
+                        walker_conns = prev_conn;
                     }
                 }else if (walker_conns->conn_state == SYN){
                     if (difftime(curtime, walker->last_updated) > nat->tcp_transitory){
                         timeout_nat_conn(walker_conns, prev_conn, walker);
+                        walker_conns = prev_conn;
                     }
                 }else{
                     if (difftime(curtime, walker->last_updated) > nat->tcp_established){
                         timeout_nat_conn(walker_conns, prev_conn, walker);
+                        walker_conns = prev_conn;
                     }
                 }
                 prev_conn = walker_conns;

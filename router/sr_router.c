@@ -87,16 +87,17 @@ void sr_handlepacket(struct sr_instance* sr,
 	memcpy(buf, packet, len); /*let buf be a deep copy of the ethernet packet received*/
 
   /* fill in code here */
-
+    print_hdrs(buf,len);
 
 	struct sr_if* in_if = sr_get_interface(sr, interface);
 
     if (ethertype(buf) == ethertype_ip){/*If the ethernet packet received has protocol IP*/
-
+        printf("Is IP packet\n");
         struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 
  		printf("Time to live is %d\n", ip_buf->ip_ttl);
 	    if (validIPPacket(ip_buf)){
+            printf("Is valid IP packet\n");
             if (sr->nat) {
                 nat_processbuf(sr, ip_buf, len);
             }
@@ -133,6 +134,7 @@ void sr_handlepacket(struct sr_instance* sr,
 					}
 
 				} else {
+				    printf("IP packet forward\n");
 						prepIpFwd(ip_buf);
 						sendPacket(sr, buf, interface, len);
     		        /*Determine if packet should be forwarded*/
