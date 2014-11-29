@@ -70,7 +70,7 @@ int sr_read_from_server(struct sr_instance* );
 void sr_init(struct sr_instance* );
 void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
 void sendPacket(struct sr_instance*, uint8_t *, char*, unsigned int);
-void nat_processbuf(struct sr_instance* , struct sr_ip_hdr * , unsigned int);
+void nat_processbuf(struct sr_instance* , struct sr_ip_hdr * , unsigned int,  char*);
 
 struct ip_id_used{
 	uint32_t ip_addr;

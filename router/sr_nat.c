@@ -95,14 +95,18 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
                     }
                 }
                 prev_conn = walker_conns;
-                walker_conns = walker_conns->next;
+                if (walker_conns){
+                    walker_conns = walker_conns->next;
+                }
             }
             if (walker->conns == NULL){
                 free_nat_mapping(walker, prev_mapping, nat);
             }
         }
         prev_mapping = walker;
-        walker = walker->next;
+        if (walker){
+            walker = walker->next;
+        }
     }
 
     pthread_mutex_unlock(&(nat->lock));

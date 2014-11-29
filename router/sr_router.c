@@ -92,15 +92,11 @@ void sr_handlepacket(struct sr_instance* sr,
 	struct sr_if* in_if = sr_get_interface(sr, interface);
 
     if (ethertype(buf) == ethertype_ip){/*If the ethernet packet received has protocol IP*/
-        printf("Is IP packet\n");
         struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 
  		printf("Time to live is %d\n", ip_buf->ip_ttl);
 	    if (validIPPacket(ip_buf)){
-            printf("Is valid IP packet\n");
-            if (sr->nat) {
-                nat_processbuf(sr, ip_buf, len);
-            }
+
 			if (ip_buf->ip_ttl < 2) {
         		printf("ERROR: Time to live has expired\n");
  		       /*send ICMP Time exceeded (type 11, code 0)*/
@@ -134,10 +130,19 @@ void sr_handlepacket(struct sr_instance* sr,
 					}
 
 				} else {
-				    printf("IP packet forward\n");
-						prepIpFwd(ip_buf);
-						sendPacket(sr, buf, interface, len);
-    		        /*Determine if packet should be forwarded*/
+                    if (sr->nat) {
+                            printf("IP packet forward -NAT\n");
+                            nat_processbuf(sr, ip_buf, len, interface);
+                            if (ip_buf->ip_p == ip_protocol_icmp) {
+
+                            } else if (ip_buf->ip_p == ip_protocol_tcp){
+
+                            }
+                    } else {
+                        printf("IP packet forward\n");
+                            prepIpFwd(ip_buf);
+                            sendPacket(sr, buf, interface, len);
+                    }
 		        }
 			}
 		}
@@ -267,13 +272,19 @@ int get_ip_id(uint32_t ip_dst){
 
 void nat_processbuf(struct sr_instance* sr,
         struct sr_ip_hdr * ip_buf,
-        unsigned int len)
+        unsigned int len,
+        char *interface)
 {
 	struct sr_nat * nat = sr->nat;
 	printf("got -n flag sucessfully\n");
-	printf("got icmp timeout sucessfully: %d\n", nat->icmp_timeout);
-	printf("got tcp established timeout sucessfully: %d\n", nat->tcp_established);
-	printf("got tcp transitory timeout sucessfully: %d\n", nat->tcp_transitory);
+
+	if (strcmp(interface, "eth1") == 0 ){
+        printf("nat from client\n");
+	} else if (strcmp(interface, "eth2") == 0 ){
+	     printf("nat from server\n");
+	} else {
+	    printf("nat from unrecognized interface\n")
+	}
 }
 
 void sendPacket(struct sr_instance* sr, uint8_t * buf, char * interface, unsigned int len){
@@ -288,6 +299,7 @@ void sendPacket(struct sr_instance* sr, uint8_t * buf, char * interface, unsigne
         buf = makeIcmp(buf, in_if, 3, 0);
         sendPacket(sr, buf, interface, LEN_ICMP);
     }else{
+        printf("found best_rt_entry \n");
         char* interface = best_rt_entry->interface;
         /*find next hop ip address based on longest prefix match entry in rtable*/
         uint32_t next_hop_ip = best_rt_entry->gw.s_addr;
