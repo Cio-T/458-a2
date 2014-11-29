@@ -77,17 +77,27 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
             struct sr_nat_connection *prev_conn;
 
             while(walker_conns){
-                if (walker_conns->conn_state == syn){
+                if (walker_conns->conn_state == UN_SYN){
+                    if (difftime(curtime, walker->last_updated) > 6.0){
+                        timeout_nat_conn(walker_conns, prev_conn, walker);
+                    }
+                }else if (walker_conns->conn_state == SYN){
                     if (difftime(curtime, walker->last_updated) > nat->tcp_transitory){
                         timeout_nat_conn(walker_conns, prev_conn, walker);
                     }
                 }else{
+                    if (difftime(curtime, walker->last_updated) > nat->tcp_established){
+                        timeout_nat_conn(walker_conns, prev_conn, walker);
+                    }
                 }
                 prev_conn = walker_conns;
                 walker_conns = walker_conns->next;
             }
+            if (walker->conns == NULL){
+                free_nat_mapping(walker, prev_mapping, nat);
+            }
         }
-        prev = walker;
+        prev_mapping = walker;
         walker = walker->next;
     }
 
