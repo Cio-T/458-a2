@@ -9,12 +9,12 @@
 
 int sr_nat_init(struct sr_instance* sr, int icmp_timeout, int tcp_established,
 	 int tcp_transitory) { /* Initializes the nat */
-	
+
 	struct sr_nat * nat;
 
 	if (sr->nat == 0){
 		sr->nat = (struct sr_nat *)malloc(sizeof(struct sr_nat));
-	} 
+	}
 	nat = sr->nat;
 
   assert(nat);
@@ -63,12 +63,36 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     pthread_mutex_lock(&(nat->lock));
 
     time_t curtime = time(NULL);
-
+    struct sr_nat_mapping *walker = nat->mappings;
+    struct sr_nat_mapping *prev = NULL;
     /* handle periodic tasks here */
+
+    while (walker){
+        if (walker->type == nat_mapping_icmp){
+            if (difftime(curtime, walker->last_updated) > nat->icmp_timeout){
+                free_nat_mapping(walker, prev, mat);
+            }
+        } else if (walker->type == nat_mapping_tcp){
+
+        }
+        prev = walker;
+        walker = walker->next;
+    }
 
     pthread_mutex_unlock(&(nat->lock));
   }
   return NULL;
+}
+
+void free_nat_mapping(struct sr_nat_mapping * walker,
+    struct sr_nat_mapping * prev, struct sr_nat *nat){
+
+        if (prev){
+            prev->next = walker->next;
+        } else {
+            nat->mappings = walker->next;
+        }
+
 }
 
 /* Get the mapping associated with given external port.
@@ -129,7 +153,28 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
 
   /* handle insert here, create a mapping, and then return a copy of it */
   struct sr_nat_mapping *mapping = NULL;
+  struct sr_nat_mapping *copy = NULL;
+  struct sr_nat_mapping *walker = nat->mappings;
+
+  while (walker){
+    walker = walker->next;
+  }
+
+  mapping = (struct sr_nat *)malloc(sizeof(struct sr_nat));
+  mapping->type = type;
+  mapping->conns = NULL;
+  if (mapping->type == nat_mapping_tcp){
+
+  }
+  mapping->ip_int = 0;
+  mapping->aux_int = 0;
+  mapping->ip_ext = 0;
+  mapping->aux_ext = 0;
+
+  mapping->next = NULL;
+  walker->next = mapping;
+  memcpy(copy, mapping, NAT_MAPPING_SIZE);
 
   pthread_mutex_unlock(&(nat->lock));
-  return mapping;
+  return copy;
 }

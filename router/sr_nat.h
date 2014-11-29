@@ -41,7 +41,7 @@ struct sr_nat {
   struct sr_nat_mapping *mappings;
 	int icmp_timeout;
 	int tcp_established;
-	int tcp_transitory; 
+	int tcp_transitory;
 
   /* threading */
   pthread_mutex_t lock;
@@ -54,6 +54,8 @@ struct sr_nat {
 int   sr_nat_init(struct sr_instance*, int, int, int);     /* Initializes the nat */
 int   sr_nat_destroy(struct sr_nat *nat);  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *nat_ptr);  /* Periodic Timout */
+void free_nat_mapping(struct sr_nat_mapping *, struct sr_nat_mapping *,
+    struct sr_nat *);
 
 /* Get the mapping associated with given external port.
    You must free the returned structure if it is not NULL. */
