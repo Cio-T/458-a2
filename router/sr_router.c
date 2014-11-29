@@ -87,15 +87,14 @@ void sr_handlepacket(struct sr_instance* sr,
 	memcpy(buf, packet, len); /*let buf be a deep copy of the ethernet packet received*/
 
   /* fill in code here */
-	if (sr->nat) {
-		nat_processbuf(sr, buf, len, interface);
-	}
+
 
 	struct sr_if* in_if = sr_get_interface(sr, interface);
 
     if (ethertype(buf) == ethertype_ip){/*If the ethernet packet received has protocol IP*/
 
         struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
+
  		printf("Time to live is %d\n", ip_buf->ip_ttl);
 	    if (validIPPacket(ip_buf)){
 			if (ip_buf->ip_ttl < 2) {
@@ -104,6 +103,9 @@ void sr_handlepacket(struct sr_instance* sr,
 				buf = makeIcmp(buf, in_if, 11, 0);
 				sendPacket(sr, buf, interface, LEN_ICMP);
 			} else {
+                if (sr->nat) {
+                    nat_processbuf(sr, ip_buf, len);
+                }
 				if (packetIsToSelf(sr, buf, 1)){
 					printf("IP packet is to self\n");
 					if (ip_buf->ip_p == ip_protocol_icmp) {
@@ -261,9 +263,8 @@ int get_ip_id(uint32_t ip_dst){
 }
 
 void nat_processbuf(struct sr_instance* sr,
-        uint8_t * packet/* lent */,
-        unsigned int len,
-        char* interface/* lent */)
+        struct sr_ip_hdr * ip_buf,
+        unsigned int len)
 {
 	struct sr_nat * nat = sr->nat;
 	printf("got -n flag sucessfully\n");

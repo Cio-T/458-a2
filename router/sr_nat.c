@@ -166,8 +166,8 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   if (mapping->type == nat_mapping_tcp){
 
   }
-  mapping->ip_int = 0;
-  mapping->aux_int = 0;
+  mapping->ip_int = ip_int;
+  mapping->aux_int = aux_int;
   mapping->ip_ext = 0;
   mapping->aux_ext = 0;
 
