@@ -72,6 +72,12 @@ int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int size){
     return 0;
 }
 
+void prepIpFwd(struct sr_ip_hdr *ip_buf){
+	/*calculate the new ttl and checksum field of ip packet*/
+	--ip_buf->ip_ttl;
+	ip_buf->ip_sum = calculate_IP_checksum(ip_buf);
+}
+
 void prepArpReply(uint8_t *buf){
 	struct sr_arp_hdr *arp_buf = (struct sr_arp_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 	uint32_t tmp_ip;
