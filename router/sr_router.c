@@ -131,12 +131,7 @@ void sr_handlepacket(struct sr_instance* sr,
 				} else {
                     if (sr->nat) {
                             printf("IP packet forward -NAT\n");
-                            nat_processbuf(sr, ip_buf, len, interface);
-                            if (ip_buf->ip_p == ip_protocol_icmp) {
-
-                            } else if (ip_buf->ip_p == ip_protocol_tcp){
-
-                            }
+                            nat_processbuf(sr, buf, len, interface);
                     } else {
                         printf("IP packet forward\n");
                             prepIpFwd(ip_buf);
@@ -278,6 +273,7 @@ void nat_processbuf(struct sr_instance* sr,
 	struct sr_nat_mapping *get_mapping = NULL;
 	struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 
+	struct sr_if* in_if = sr_get_interface(sr, interface);
 	printf("got -n flag sucessfully\n");
 
 	if (strcmp(interface, "eth1") == 0 ){
@@ -289,7 +285,7 @@ void nat_processbuf(struct sr_instance* sr,
                 get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
             }
             tcp_buf->src_port = get_mapping->aux_ext;
-            ip_buf->ip_src = get_mapping->ip_ext;
+            ip_buf->ip_src = in_if->ip ;
             prepIpFwd(ip_buf);
             sendPacket(sr, buf, interface, len);
             updateNATConnection(nat, tcp_buf);
@@ -300,7 +296,7 @@ void nat_processbuf(struct sr_instance* sr,
 	     printf("nat from server\n");
         if (ip_buf->ip_p == ip_protocol_tcp){
             struct sr_tcp_hdr * tcp_buf = (struct sr_tcp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
-            get_mapping = sr_nat_lookup_external(nat, ip_buf->ip_dst, tcp_buf->dest_port, nat_mapping_tcp);
+            get_mapping = sr_nat_lookup_external(nat, tcp_buf->dest_port, nat_mapping_tcp);
             if (get_mapping == NULL) {
 
             }
