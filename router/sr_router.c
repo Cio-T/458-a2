@@ -140,7 +140,7 @@ void sr_handlepacket(struct sr_instance* sr,
 			}
 		}
 
-	} else if (sr->nat == NULL && ethertype(buf) == ethertype_arp){/*If the ethernet packet received is type ARP*/
+	} else if (ethertype(buf) == ethertype_arp){/*If the ethernet packet received is type ARP*/
         struct sr_arp_hdr *arp_buf = (struct sr_arp_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 		if (packetIsToSelf(sr, buf, 0)){
     	   	if (ntohs(arp_buf->ar_op) == arp_op_reply){/*If the ARP packet is ARP reply*/
