@@ -81,14 +81,14 @@ void sr_handlepacket(struct sr_instance* sr,
   assert(interface);
 
   printf("*** -> Received packet of length %d \n",len);
-	
+
 	uint8_t *buf;
 	buf = (uint8_t *)malloc(len); /*allocate new memory for buf*/
 	memcpy(buf, packet, len); /*let buf be a deep copy of the ethernet packet received*/
 
   /* fill in code here */
 	if (sr->nat) {
-		nat_processbuf(sr, buf, len, interface);	
+		nat_processbuf(sr, buf, len, interface);
 	}
 
 	struct sr_if* in_if = sr_get_interface(sr, interface);
@@ -277,31 +277,31 @@ void sendPacket(struct sr_instance* sr, uint8_t * buf, char * interface, unsigne
     struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 	struct sr_if* in_if = sr_get_interface(sr, interface);
 
-        		    struct sr_rt* best_rt_entry = getBestRtEntry(sr->routing_table, ip_buf);
+    struct sr_rt* best_rt_entry = getBestRtEntry(sr->routing_table, ip_buf);
 
-            		if (!best_rt_entry){/*no matching entry in routing table*/
-                		/*send ICMP Destination net unreachable (type 3, code 0)*/
-						buf = makeIcmp(buf, in_if, 3, 0);
-						sendPacket(sr, buf, interface, LEN_ICMP);
-	    	        }else{
-						char* interface = best_rt_entry->interface;
-        	    	    /*find next hop ip address based on longest prefix match entry in rtable*/
-            	    	uint32_t next_hop_ip = best_rt_entry->gw.s_addr;
-  	  		            /*deal with ARP*/
-    	    	        struct sr_arpentry *next_hop_ip_lookup;
-            		    if ((next_hop_ip_lookup = sr_arpcache_lookup(&(sr->cache), next_hop_ip))){
-        	    	        /*Forward packet*/
-							struct sr_if* out_if = sr_get_interface(sr, interface);
-							prepEtheFwd(buf, next_hop_ip_lookup->mac, out_if->addr);
-							if (sr_send_packet(sr, buf, len, interface) < 0)
-								printf("Error forwarding IP packet.");
-    		            	
-							free(next_hop_ip_lookup);
-    	    		    } else {
-        	    			struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), next_hop_ip, buf,
-																			len, interface);
-        	    	    	sr_handle_arpreq(sr, req);
-   		    	        }
-	
-    		        }
+    if (!best_rt_entry){/*no matching entry in routing table*/
+        /*send ICMP Destination net unreachable (type 3, code 0)*/
+        buf = makeIcmp(buf, in_if, 3, 0);
+        sendPacket(sr, buf, interface, LEN_ICMP);
+    }else{
+        char* interface = best_rt_entry->interface;
+        /*find next hop ip address based on longest prefix match entry in rtable*/
+        uint32_t next_hop_ip = best_rt_entry->gw.s_addr;
+        /*deal with ARP*/
+        struct sr_arpentry *next_hop_ip_lookup;
+        if ((next_hop_ip_lookup = sr_arpcache_lookup(&(sr->cache), next_hop_ip))){
+            /*Forward packet*/
+            struct sr_if* out_if = sr_get_interface(sr, interface);
+            prepEtheFwd(buf, next_hop_ip_lookup->mac, out_if->addr);
+            if (sr_send_packet(sr, buf, len, interface) < 0)
+                printf("Error forwarding IP packet.");
+
+            free(next_hop_ip_lookup);
+        } else {
+            struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), next_hop_ip, buf,
+                                                            len, interface);
+            sr_handle_arpreq(sr, req);
+        }
+
+    }
 }
