@@ -28,8 +28,8 @@ enum nat_mapping_size {
 
 struct sr_nat_connection {
   /* add TCP connection state data members here */
-  uint32_t conn_ip; /* ip addr connected to*/
-  uint16_t conn_aux; /* port # connected to*/
+  uint32_t ip_conn; /* ip addr connected to*/
+  uint16_t aux_conn; /* port # connected to*/
 
   int conn_state;
   struct sr_nat_connection *next;
@@ -84,5 +84,7 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
 struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   uint32_t ip_int, uint16_t aux_int, sr_nat_mapping_type type );
 
+
+void updateNATConnection(struct sr_nat *, struct sr_tcp_hdr *);
 
 #endif

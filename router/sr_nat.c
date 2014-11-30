@@ -235,3 +235,8 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   pthread_mutex_unlock(&(nat->lock));
   return copy;
 }
+
+void updateNATConnection(struct sr_nat * nat, struct sr_tcp_hdr * tcp_buf ){
+
+
+}

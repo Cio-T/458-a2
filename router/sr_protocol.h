@@ -100,8 +100,8 @@ typedef struct sr_icmp_echo_hdr sr_icmp_echo_hdr_t;
 
 
 struct sr_tcp_hdr {
-  uint16_t tcp_src_port;
-  uint16_t tcp_dest_port;
+  uint16_t src_port;
+  uint16_t dest_port;
   uint32_t seq_num;
   uint32_t ack_num;
   uint16_t tcp_control;

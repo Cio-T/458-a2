@@ -270,22 +270,48 @@ int get_ip_id(uint32_t ip_dst){
 }
 
 void nat_processbuf(struct sr_instance* sr,
-        struct sr_ip_hdr * ip_buf,
+        uint8_t * buf,
         unsigned int len,
         char *interface)
 {
 	struct sr_nat * nat = sr->nat;
+	struct sr_nat_mapping *get_mapping = NULL;
+	struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
+
 	printf("got -n flag sucessfully\n");
 
 	if (strcmp(interface, "eth1") == 0 ){
         printf("nat from client\n");
 		if (ip_buf->ip_p == ip_protocol_tcp){
-
+            struct sr_tcp_hdr * tcp_buf = (struct sr_tcp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
+            get_mapping = sr_nat_lookup_internal(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
+            if (get_mapping == NULL) {
+                get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
+            }
+            tcp_buf->src_port = get_mapping->aux_ext;
+            ip_buf->ip_src = get_mapping->ip_ext;
+            prepIpFwd(ip_buf);
+            sendPacket(sr, buf, interface, len);
+            updateNATConnection(nat, tcp_buf);
         } else if (ip_buf->ip_p == ip_protocol_icmp) {
 
         }
 	} else if (strcmp(interface, "eth2") == 0 ){
 	     printf("nat from server\n");
+        if (ip_buf->ip_p == ip_protocol_tcp){
+            struct sr_tcp_hdr * tcp_buf = (struct sr_tcp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
+            get_mapping = sr_nat_lookup_external(nat, ip_buf->ip_dst, tcp_buf->dest_port, nat_mapping_tcp);
+            if (get_mapping == NULL) {
+
+            }
+            tcp_buf->dest_port = get_mapping->aux_int;
+            ip_buf->ip_dst = get_mapping->ip_int;
+            prepIpFwd(ip_buf);
+            sendPacket(sr, buf, interface, len);
+            updateNATConnection(nat, tcp_buf);
+        } else if (ip_buf->ip_p == ip_protocol_icmp) {
+
+        }
 	} else {
 	    printf("nat from unrecognized interface\n");
 	}
