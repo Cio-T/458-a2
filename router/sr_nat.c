@@ -46,13 +46,28 @@ int sr_nat_init(struct sr_instance* sr, int icmp_timeout, int tcp_established,
 
 int sr_nat_destroy(struct sr_nat *nat) {  /* Destroys the nat (free memory) */
 
-  pthread_mutex_lock(&(nat->lock));
+    pthread_mutex_lock(&(nat->lock));
 
-  /* free nat memory here */
+    /* free nat memory here */
+    struct sr_nat_mapping *mapping = nat->mappings;
+    struct sr_nat_mapping *walker = NULL;
+    /* handle periodic tasks here */
 
-  pthread_kill(nat->thread, SIGKILL);
-  return pthread_mutex_destroy(&(nat->lock)) &&
-    pthread_mutexattr_destroy(&(nat->attr));
+    while ((walker = mapping->next)){
+       if (walker->type == nat_mapping_tcp){
+            struct sr_nat_connection *conns = walker->conns;
+            struct sr_nat_connection *conn_walker = NULL;
+            while((conn_walker = conns->next)){
+                conns->next = conn_walker->next;
+                free(conn_walker);
+            }
+        }
+        mapping->next = walker->next;
+        free(walker);
+    }
+    pthread_kill(nat->thread, SIGKILL);
+    return pthread_mutex_destroy(&(nat->lock)) &&
+        pthread_mutexattr_destroy(&(nat->attr));
 
 }
 
