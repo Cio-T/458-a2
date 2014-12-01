@@ -66,6 +66,7 @@ int   sr_nat_destroy(struct sr_nat *nat);  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *nat_ptr);  /* Periodic Timout */
 void free_nat_mapping(struct sr_nat_mapping *, struct sr_nat_mapping *,
     struct sr_nat *);
+void free_walker_conns(struct sr_nat *, struct sr_nat_mapping *, time_t)
 void timeout_nat_conn(struct sr_nat_connection *, struct sr_nat_connection *,
     struct sr_nat_mapping *);
 

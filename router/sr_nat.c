@@ -76,7 +76,7 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
                 free_walker = 1;
             }
         } else if (walker->type == nat_mapping_tcp){
-            free_walker_conns(nat, walker);
+            free_walker_conns(nat, walker, curtime);
             if (walker->conns == NULL){
                 free_nat_mapping(walker, prev_mapping, nat);
                 free_walker = 1;
@@ -106,7 +106,8 @@ void free_nat_mapping(struct sr_nat_mapping * mapping,
 }
 
 void free_walker_conns(struct sr_nat *nat ,
-    struct sr_nat_mapping * walker){
+    struct sr_nat_mapping * walker,
+    time_t curtime){
 
     struct sr_nat_connection *walker_conns = walker->conns;
     struct sr_nat_connection *prev_conn = NULL;
