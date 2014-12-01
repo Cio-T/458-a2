@@ -86,6 +86,6 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   uint32_t ip_int, uint16_t aux_int, sr_nat_mapping_type type );
 
 
-void updateNATConnection(struct sr_nat *, struct sr_tcp_hdr *);
+void updateNATConnection(struct sr_nat_mapping *, struct sr_tcp_hdr *);
 
 #endif

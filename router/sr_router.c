@@ -280,6 +280,7 @@ void nat_processbuf(struct sr_instance* sr,
         printf("nat from client\n");
 		if (ip_buf->ip_p == ip_protocol_tcp){
             struct sr_tcp_hdr * tcp_buf = (struct sr_tcp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
+
             get_mapping = sr_nat_lookup_internal(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
             if (get_mapping == NULL) {
                 get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
@@ -289,6 +290,7 @@ void nat_processbuf(struct sr_instance* sr,
             prepIpFwd(ip_buf);
             sendPacket(sr, buf, interface, len);
             updateNATConnection(nat, tcp_buf);
+
         } else if (ip_buf->ip_p == ip_protocol_icmp) {
 
         }

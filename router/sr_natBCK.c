@@ -153,48 +153,55 @@ void timeout_nat_conn(struct sr_nat_connection *conn,
 };
 
 /* Get the mapping associated with given external port.
-   You must not modify the returned structure externally. */
+   You must not modify the returned structure if it is not NULL. */
 struct sr_nat_mapping *sr_nat_lookup_external(struct sr_nat *nat,
     uint16_t aux_ext, sr_nat_mapping_type type ) {
 
   pthread_mutex_lock(&(nat->lock));
 
   /* handle lookup here, malloc and assign to copy */
+  struct sr_nat_mapping *copy = NULL;
   struct sr_nat_mapping *walker = nat->mappings;
 
   while (walker){
     if (walker->type == type && walker->aux_ext == aux_ext){
-        break;
+        copy = malloc(NAT_MAPPING_SIZE);
+        memcpy(copy, walker, NAT_MAPPING_SIZE);
+	break;
     }
     walker = walker->next;
   }
+
   pthread_mutex_unlock(&(nat->lock));
-  return walker;
+  return copy;
 }
 
 /* Get the mapping associated with given internal (ip, port) pair.
-   You must not modify the returned structure externally. */
+   You must free the returned structure if it is not NULL. */
 struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
   uint32_t ip_int, uint16_t aux_int, sr_nat_mapping_type type ) {
 
   pthread_mutex_lock(&(nat->lock));
 
   /* handle lookup here, malloc and assign to copy. */
+  struct sr_nat_mapping *copy = NULL;
   struct sr_nat_mapping *walker = nat->mappings;
 
   while (walker){
     if (walker->type == type && walker->ip_int == ip_int && walker->aux_int == aux_int){
-        break;
+        copy = malloc(NAT_MAPPING_SIZE);
+        memcpy(copy, walker, NAT_MAPPING_SIZE);
+	break;
     }
     walker = walker->next;
   }
 
   pthread_mutex_unlock(&(nat->lock));
-  return walker;
+  return copy;
 }
 
 /* Insert a new mapping into the nat's mapping table.
-   Return the new mapping, must not modify the returned structure.
+   Actually returns a copy to the new mapping, for thread safety.
  */
 struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   uint32_t ip_int, uint16_t aux_int, sr_nat_mapping_type type ) {
@@ -203,6 +210,7 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
 
   /* handle insert here, create a mapping, and then return a copy of it */
   struct sr_nat_mapping *mapping = NULL;
+  struct sr_nat_mapping *copy = NULL;
   struct sr_nat_mapping *walker = nat->mappings;
 
   while (walker){
@@ -222,12 +230,13 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
 
   mapping->next = NULL;
   walker->next = mapping;
+  memcpy(copy, mapping, NAT_MAPPING_SIZE);
 
   pthread_mutex_unlock(&(nat->lock));
-  return mapping;
+  return copy;
 }
 
-void updateNATConnection(struct sr_nat_mapping * mapping, struct sr_tcp_hdr * tcp_buf ){
+void updateNATConnection(struct sr_nat * nat, struct sr_tcp_hdr * tcp_buf ){
 
 
 }

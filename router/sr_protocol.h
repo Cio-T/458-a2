@@ -92,8 +92,8 @@ struct sr_icmp_echo_hdr {
   uint8_t icmp_type;
   uint8_t icmp_code;
   uint16_t icmp_sum;
-  uint16_t echo_identifier;
-  uint16_t echo_sequence_num;
+  uint16_t identifier;
+  uint16_t sequence_num;
 
 } __attribute__ ((packed)) ;
 typedef struct sr_icmp_echo_hdr sr_icmp_echo_hdr_t;
@@ -104,7 +104,8 @@ struct sr_tcp_hdr {
   uint16_t dest_port;
   uint32_t seq_num;
   uint32_t ack_num;
-  uint16_t tcp_control;
+  uint8_t  data_offset;  // 4 bits
+  uint8_t  flags;
   uint16_t advertise_window;
   uint16_t tcp_checksum;
   uint16_t urgent_pointer;
