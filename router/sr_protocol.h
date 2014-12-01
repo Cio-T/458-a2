@@ -104,11 +104,11 @@ struct sr_tcp_hdr {
   uint16_t dest_port;
   uint32_t seq_num;
   uint32_t ack_num;
-  uint8_t  data_offset;  // 4 bits
+  uint8_t  data_offset;
   uint8_t  flags;
-  uint16_t advertise_window;
-  uint16_t tcp_checksum;
-  uint16_t urgent_pointer;
+  uint16_t window_size;
+  uint16_t tcp_sum;
+  uint16_t urgent_p;
 
 } __attribute__ ((packed)) ;
 typedef struct sr_tcp_hdr sr_tcp_hdr_t;

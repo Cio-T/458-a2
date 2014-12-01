@@ -280,22 +280,33 @@ void nat_processbuf(struct sr_instance* sr,
         printf("nat from client\n");
 		if (ip_buf->ip_p == ip_protocol_tcp){
             struct sr_tcp_hdr * tcp_buf = (struct sr_tcp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
-
-            get_mapping = sr_nat_lookup_internal(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
-            if (get_mapping == NULL) {
-                get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
+            if (validateTCPChecksum(tcp_buf)){
+                get_mapping = sr_nat_lookup_internal(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
+                if (get_mapping == NULL) {
+                    get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
+                }
+                tcp_buf->src_port = get_mapping->aux_ext;
+                ip_buf->ip_src = in_if->ip ;
+                prepIpFwd(ip_buf);
+                sendPacket(sr, buf, interface, len);
+                updateNATConnection(get_mapping, tcp_buf);
             }
-            tcp_buf->src_port = get_mapping->aux_ext;
-            ip_buf->ip_src = in_if->ip ;
-            prepIpFwd(ip_buf);
-            sendPacket(sr, buf, interface, len);
-            updateNATConnection(get_mapping, tcp_buf);
 
         } else if (ip_buf->ip_p == ip_protocol_icmp) {
+            printf("NAT protocol is ICMP\n");
+            struct sr_icmp_hdr * icmp_hdr = (struct sr_icmp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
+
+            /*check if packet is ICMP echo request (type 8) */
+            if (icmp_hdr->icmp_type == 8 || icmp_hdr->icmp_type == 0){
+                printf("NAT ICMP echo request or reply\n");
+                if (validateICMPChecksum(icmp_hdr, ICMP_SIZE)){
+                    printf("valid NAT ICMP echo request or reply\n");
+                }
+            }
 
         }
 	} else if (strcmp(interface, "eth2") == 0 ){
-	     printf("nat from server\n");
+        printf("nat from server\n");
         if (ip_buf->ip_p == ip_protocol_tcp){
             struct sr_tcp_hdr * tcp_buf = (struct sr_tcp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
             get_mapping = sr_nat_lookup_external(nat, tcp_buf->dest_port, nat_mapping_tcp);

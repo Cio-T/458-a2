@@ -72,6 +72,16 @@ int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int size){
     return 0;
 }
 
+int validateTCPChecksum(struct sr_tcp_hdr * tcp_buf, int size){
+    uint16_t calc_sum = calculate_IP_checksum(tcp_buf);
+    if (tcp_buf->tcp_sum == calc_sum){
+        return 1;
+    }
+    printf("original TCP sum is %d, and calculated TCP sum is %d\n",
+           tcp_buf->tcp_sum, calc_sum);
+    return 0;
+}
+
 void prepIpFwd(struct sr_ip_hdr *ip_buf){
 	/*calculate the new ttl and checksum field of ip packet*/
 	--ip_buf->ip_ttl;
