@@ -289,7 +289,7 @@ void nat_processbuf(struct sr_instance* sr,
             ip_buf->ip_src = in_if->ip ;
             prepIpFwd(ip_buf);
             sendPacket(sr, buf, interface, len);
-            updateNATConnection(nat, tcp_buf);
+            updateNATConnection(get_mapping, tcp_buf);
 
         } else if (ip_buf->ip_p == ip_protocol_icmp) {
 
@@ -306,7 +306,7 @@ void nat_processbuf(struct sr_instance* sr,
             ip_buf->ip_dst = get_mapping->ip_int;
             prepIpFwd(ip_buf);
             sendPacket(sr, buf, interface, len);
-            updateNATConnection(nat, tcp_buf);
+            updateNATConnection(get_mapping, tcp_buf);
         } else if (ip_buf->ip_p == ip_protocol_icmp) {
 
         }
