@@ -46,28 +46,13 @@ int sr_nat_init(struct sr_instance* sr, int icmp_timeout, int tcp_established,
 
 int sr_nat_destroy(struct sr_nat *nat) {  /* Destroys the nat (free memory) */
 
-    pthread_mutex_lock(&(nat->lock));
+  pthread_mutex_lock(&(nat->lock));
 
-    /* free nat memory here */
-    struct sr_nat_mapping *mapping = nat->mappings;
-    struct sr_nat_mapping *walker = NULL;
-    /* handle periodic tasks here */
+  /* free nat memory here */
 
-    while ((walker = mapping->next)){
-       if (walker->type == nat_mapping_tcp){
-            struct sr_nat_connection *conns = walker->conns;
-            struct sr_nat_connection *conn_walker = NULL;
-            while((conn_walker = conns->next)){
-                conns->next = conn_walker->next;
-                free(conn_walker);
-            }
-        }
-        mapping->next = walker->next;
-        free(walker);
-    }
-    pthread_kill(nat->thread, SIGKILL);
-    return pthread_mutex_destroy(&(nat->lock)) &&
-        pthread_mutexattr_destroy(&(nat->attr));
+  pthread_kill(nat->thread, SIGKILL);
+  return pthread_mutex_destroy(&(nat->lock)) &&
+    pthread_mutexattr_destroy(&(nat->attr));
 
 }
 
@@ -80,48 +65,28 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     time_t curtime = time(NULL);
     struct sr_nat_mapping *walker = nat->mappings;
     struct sr_nat_mapping *prev_mapping = NULL;
+    int free_walker;
     /* handle periodic tasks here */
 
     while (walker){
+        free_walker = 0;
         if (walker->type == nat_mapping_icmp){
             if (difftime(curtime, walker->last_updated) > nat->icmp_timeout){
                 free_nat_mapping(walker, prev_mapping, nat);
-                walker = prev_mapping;
+                free_walker = 1;
             }
         } else if (walker->type == nat_mapping_tcp){
-            struct sr_nat_connection *walker_conns = walker->conns;
-            struct sr_nat_connection *prev_conn = NULL;
-
-            while(walker_conns){
-                if (walker_conns->conn_state == UN_SYN){
-                    if (difftime(curtime, walker->last_updated) > 6.0){
-                        timeout_nat_conn(walker_conns, prev_conn, walker);
-                        walker_conns = prev_conn;
-                    }
-                }else if (walker_conns->conn_state == SYN){
-                    if (difftime(curtime, walker->last_updated) > nat->tcp_transitory){
-                        timeout_nat_conn(walker_conns, prev_conn, walker);
-                        walker_conns = prev_conn;
-                    }
-                }else{
-                    if (difftime(curtime, walker->last_updated) > nat->tcp_established){
-                        timeout_nat_conn(walker_conns, prev_conn, walker);
-                        walker_conns = prev_conn;
-                    }
-                }
-                prev_conn = walker_conns;
-                if (walker_conns){
-                    walker_conns = walker_conns->next;
-                }
-            }
+            free_walker_conns(nat, walker);
             if (walker->conns == NULL){
                 free_nat_mapping(walker, prev_mapping, nat);
+                free_walker = 1;
             }
         }
         prev_mapping = walker;
-        if (walker){
-            walker = walker->next;
+        if (free_walker){
+            free(walker);
         }
+        walker = prev_mapping->next;
     }
 
     pthread_mutex_unlock(&(nat->lock));
@@ -137,7 +102,41 @@ void free_nat_mapping(struct sr_nat_mapping * mapping,
     } else {
         nat->mappings = mapping->next;
     }
-    free(mapping);
+
+}
+
+void free_walker_conns(struct sr_nat *nat ,
+    struct sr_nat_mapping * walker){
+
+    struct sr_nat_connection *walker_conns = walker->conns;
+    struct sr_nat_connection *prev_conn = NULL;
+    int free_conn;
+
+    while(walker_conns){
+        free_conn = 0;
+        if (walker_conns->conn_state == UN_SYN){
+            if (difftime(curtime, walker->last_updated) > 6.0){
+                timeout_nat_conn(walker_conns, prev_conn, walker);
+                free_conn = 1;
+            }
+        }else if (walker_conns->conn_state == SYN){
+            if (difftime(curtime, walker->last_updated) > nat->tcp_transitory){
+                timeout_nat_conn(walker_conns, prev_conn, walker);
+                free_conn = 1;
+            }
+        }else{
+            if (difftime(curtime, walker->last_updated) > nat->tcp_established){
+                timeout_nat_conn(walker_conns, prev_conn, walker);
+                free_conn = 1;
+            }
+        }
+        prev_conn = walker_conns;
+        if (free_conn){
+            free(walker_conns);
+
+        }
+        walker_conns = prev_conn->next;
+    }
 }
 
 void timeout_nat_conn(struct sr_nat_connection *conn,
@@ -149,7 +148,7 @@ void timeout_nat_conn(struct sr_nat_connection *conn,
     } else {
         mapping->conns = conn->next;
     }
-    free(conn);
+
 };
 
 /* Get the mapping associated with given external port.
