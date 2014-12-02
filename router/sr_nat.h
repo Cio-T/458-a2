@@ -58,6 +58,7 @@ struct sr_nat {
   int icmp_timeout;
   int tcp_established;
   int tcp_transitory;
+  uint32_t extif_ip;
 
   /* threading */
   pthread_mutex_t lock;
@@ -88,14 +89,14 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
 
 /* Insert a new mapping into the nat's mapping table.
    You must free the returned structure if it is not NULL. */
-struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat, uint32_t ip_int, 
-	uint16_t aux_int, uint32_t ip_ext, sr_nat_mapping_type type );
+struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat, uint32_t ip_int,
+	uint16_t aux_int, sr_nat_mapping_type type );
 
 
 int updateNATConnection(struct sr_nat_connection * find_conn, uint8_t tcp_flag, int isClient);
-void insertNATConnection(struct sr_nat_mapping * mapping, uint32_t ip_conn, 
+void insertNATConnection(struct sr_nat_mapping * mapping, uint32_t ip_conn,
 	uint16_t aux_conn, int conn_state);
-int processNATConnection(struct sr_nat *nat, struct sr_nat_mapping * mapping, uint32_t ip_conn, 
+int processNATConnection(struct sr_nat *nat, struct sr_nat_mapping * mapping, uint32_t ip_conn,
 	uint16_t aux_conn, uint8_t tcp_flag, int isClient);
 
 int rand_between(int min, int max);

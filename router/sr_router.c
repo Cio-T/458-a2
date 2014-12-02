@@ -267,7 +267,6 @@ void nat_processbuf(struct sr_instance* sr,
 	struct sr_nat_mapping *get_mapping = NULL;
 	struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 
-	struct sr_if* ext_if = sr_get_interface(sr, "eth2");
 	int isClient = 0;
 	printf("got -n flag sucessfully\n");
 
@@ -280,7 +279,7 @@ void nat_processbuf(struct sr_instance* sr,
 				/*get NAT mapping, if not found, insert new mapping*/
                 get_mapping = sr_nat_lookup_internal(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
                 if (get_mapping == NULL) {
-                    get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, tcp_buf->src_port, ext_if->ip, nat_mapping_tcp);
+                    get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
                 }
 				/*update connections of NAT mapping*/
 				if (processNATConnection(nat, get_mapping, ip_buf->ip_dst, tcp_buf->dest_port, tcp_buf->flags, isClient)){
@@ -298,7 +297,7 @@ void nat_processbuf(struct sr_instance* sr,
 
                 get_mapping = sr_nat_lookup_external(nat, tcp_buf->dest_port, nat_mapping_tcp);
                 if (get_mapping == NULL) {
-                    get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_dst, tcp_buf->dest_port, ext_if->ip, nat_mapping_tcp);
+                    get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_dst, tcp_buf->dest_port, nat_mapping_tcp);
                 }
 				/*update connections of NAT mapping*/
 				if (processNATConnection(nat, get_mapping, ip_buf->ip_dst, tcp_buf->dest_port, tcp_buf->flags, isClient)){
@@ -316,13 +315,46 @@ void nat_processbuf(struct sr_instance* sr,
         }
     } else if (ip_buf->ip_p == ip_protocol_icmp) {
         printf("NAT protocol is ICMP\n");
-        struct sr_icmp_hdr * icmp_hdr = (struct sr_icmp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
+        struct sr_icmp_echo_hdr * icmp_buf = (struct sr_icmp_echo_hdr *)(buf + ETHE_SIZE + IP_SIZE);
 
         /*check if packet is ICMP echo request (type 8) */
-        if (validateICMPChecksum(icmp_hdr, ICMP_ECHO_SIZE)){
+        if (validateICMPChecksum(icmp_buf, ICMP_ECHO_SIZE)){
             printf("valid NAT ICMP packet\n");
-        	if (icmp_hdr->icmp_type == 8 || icmp_hdr->icmp_type == 0){
+        	if (icmp_buf->icmp_type == 8 || icmp_buf->icmp_type == 0){
             	printf("NAT ICMP echo request or reply\n");
+
+            	if (strcmp(interface, "eth1") == 0 ){
+                    printf("nat icmp from client\n");
+                    isClient = 1;
+                    /*get NAT mapping, if not found, insert new mapping*/
+                    get_mapping = sr_nat_lookup_internal(nat, ip_buf->ip_src, icmp_buf->icmp_id, nat_mapping_icmp);
+                    if (get_mapping == NULL) {
+                        get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, icmp_buf->icmp_id, nat_mapping_icmp);
+                    }
+
+                    /*modify and foward icmp packet*/
+                    icmp_buf->icmp_id = get_mapping->aux_ext;
+                    icmp_buf->icmp_sum = calculate_icmp_checksum(icmp_buf);
+                    ip_buf->ip_src = get_mapping->ip_ext;
+                    prepIpFwd(ip_buf);
+                    sendPacket(sr, buf, interface, len);
+
+                } else if (strcmp(interface, "eth2") == 0 ){
+                    printf("nat ICMP from server\n");
+
+                    get_mapping = sr_nat_lookup_external(nat, icmp_buf->dest_port, nat_mapping_icmp);
+                    if (get_mapping == NULL) {
+                        get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_dst, icmp_buf->dest_port, nat_mapping_icmp);
+                    }
+
+                    icmp_buf->icmp_sum = calculate_icmp_checksum(icmp_buf);
+                    ip_buf->ip_dst = get_mapping->ip_int;
+                    prepIpFwd(ip_buf);
+                    sendPacket(sr, buf, interface, len);
+
+                }  else {
+                    printf("nat ICMP from unrecognized interface\n");
+                }
         	}
         }
 

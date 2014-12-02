@@ -12,6 +12,10 @@
 #include "sr_utils.h"
 #include "sr_helper.h"
 
+void prepICMPEchoNat(struct sr_icmp_echo_hdr * icmp_buf){
+    icmp_buf->icmp_sum = calculate_icmp_checksum(icmp_buf);
+}
+
 void makeIcmpEchoReply(uint8_t* buf, struct sr_if* out_if){
 	struct sr_ip_hdr *ip_hdr = (struct sr_ip_hdr *)(buf + ETHE_SIZE);
 	struct sr_icmp_hdr * icmp_hdr = (struct sr_icmp_hdr*)(buf + ETHE_SIZE + IP_SIZE);

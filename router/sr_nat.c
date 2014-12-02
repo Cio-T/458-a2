@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 int free_ports[64512];
+int icmp_id_counter;
 
 int sr_nat_init(struct sr_instance* sr, int icmp_timeout, int tcp_established,
 	 int tcp_transitory) { /* Initializes the nat */
@@ -20,7 +21,7 @@ int sr_nat_init(struct sr_instance* sr, int icmp_timeout, int tcp_established,
 	nat = sr->nat;
 
   assert(nat);
-  init_ports();
+
   /* Acquire mutex lock */
   pthread_mutexattr_init(&(nat->attr));
   pthread_mutexattr_settype(&(nat->attr), PTHREAD_MUTEX_RECURSIVE);
@@ -41,6 +42,10 @@ int sr_nat_init(struct sr_instance* sr, int icmp_timeout, int tcp_established,
   nat->icmp_timeout = icmp_timeout;
   nat->tcp_established = tcp_established;
   nat->tcp_transitory = tcp_transitory;
+  nat->extif_ip = sr_get_interface(sr, "eth2")->ip;
+
+  init_ports();
+  icmp_id_counter = 1;
 
   return success;
 }
@@ -61,6 +66,25 @@ int sr_nat_destroy(struct sr_nat *nat) {  /* Destroys the nat (free memory) */
   pthread_mutex_lock(&(nat->lock));
 
   /* free nat memory here */
+  struct sr_nat_mapping *walker = nat->mappings;
+  struct sr_nat_mapping *next_mapping = NULL;
+
+  if (walker){
+    struct sr_nat_connection *walker_conns, *next_conn;
+    while ((next_mapping = walker->next)){
+        next_conn = NULL;
+        walker_conns = walker->conns;
+        if (walker_conns){
+            while ((next_conn = walker_conns->next)){
+                free(walker_conns);
+                walker_conns = next_conn;
+            }
+        }
+        free(walker);
+        walker = next_mapping;
+    }
+  }
+  free(nat);
 
   pthread_kill(nat->thread, SIGKILL);
   return pthread_mutex_destroy(&(nat->lock)) &&
@@ -97,7 +121,7 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
         prev_mapping = walker;
         if (free_walker){
             free(walker);
-			free_ports[walker->aux_ext - 1024] = 1;	
+			free_ports[walker->aux_ext - 1024] = 1;
         }
         walker = prev_mapping->next;
     }
@@ -209,8 +233,8 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
 /* Insert a new mapping into the nat's mapping table.
    Return the new mapping, must not modify the returned structure.
  */
-struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat, uint32_t ip_int, 
-	uint16_t aux_int, uint32_t ip_ext, sr_nat_mapping_type type ) {
+struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat, uint32_t ip_int,
+	uint16_t aux_int, sr_nat_mapping_type type ) {
 
   pthread_mutex_lock(&(nat->lock));
 
@@ -223,14 +247,22 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat, uint32_t ip_int
   mapping->conns = NULL;
   mapping->ip_int = ip_int;
   mapping->aux_int = aux_int;
-  mapping->ip_ext = ip_ext;
+  mapping->ip_ext = nat->extif_ip;
 
-  int i = rand_between(1, 64511);
-  while (!free_ports[i])
-	i = rand_between(1, 64511);
-  mapping->aux_ext = i + 1024;
-  free_ports[i] = 0;
-	
+  if (mapping->type == nat_mapping_tcp){
+    int i = rand_between(1, 64511);
+    while (!free_ports[i])
+        i = rand_between(1, 64511);
+    mapping->aux_ext = i + 1024;
+    free_ports[i] = 0;
+  } else {
+    mapping->aux_ext = icmp_id_counter;
+    if (icmp_id_counter < 65535)
+        ++icmp_id_counter;
+    else
+        icmp_id_counter = 1;
+  }
+
   if (walker){
   	mapping->next = walker->next;
   	walker->next = mapping;
@@ -248,15 +280,15 @@ int updateNATConnection(struct sr_nat_connection * find_conn, uint8_t tcp_flag, 
 
 		int cur_conn = find_conn->conn_state;
 		if (cur_conn == UN_SYN){
-			if (isClient && tcp_flag == FLAG_SYN) 
+			if (isClient && tcp_flag == FLAG_SYN)
 				find_conn->conn_state = CONN;
 		} else if (cur_conn == SYN){
 			if (!isClient){
-				if (tcp_flag == FLAG_SYN_ACK) 
+				if (tcp_flag == FLAG_SYN_ACK)
 					find_conn->conn_state = SYN_ACK;
-				else if (tcp_flag == FLAG_SYN) 
+				else if (tcp_flag == FLAG_SYN)
                     find_conn->conn_state = CONN;
-           
+
 			}
 		} else if (cur_conn == SYN_ACK){
 			if (isClient && tcp_flag == FLAG_ACK)
@@ -298,30 +330,30 @@ int updateNATConnection(struct sr_nat_connection * find_conn, uint8_t tcp_flag, 
 		return 0;
 }
 
-void insertNATConnection(struct sr_nat_mapping * mapping, uint32_t ip_conn, 
+void insertNATConnection(struct sr_nat_mapping * mapping, uint32_t ip_conn,
 	uint16_t aux_conn, int conn_state){
-	
+
 	struct sr_nat_connection *new_conn = NULL;
 	struct sr_nat_connection *conns = mapping->conns;
-		
+
 	new_conn = (struct sr_nat_connection *)malloc(sizeof(struct sr_nat_connection));
 	new_conn->ip_conn = ip_conn;
 	new_conn->aux_conn = aux_conn;
-	
+
 	if (conns){
-		new_conn->next = conns->next;	
+		new_conn->next = conns->next;
 		conns->next = new_conn;
 	} else {
-		new_conn->next = NULL;	
+		new_conn->next = NULL;
 		mapping->conns = new_conn;
 	}
 }
 
-int processNATConnection(struct sr_nat *nat, struct sr_nat_mapping * mapping, 
+int processNATConnection(struct sr_nat *nat, struct sr_nat_mapping * mapping,
 	uint32_t ip_conn, uint16_t aux_conn, uint8_t tcp_flag, int isClient){
 
 	pthread_mutex_lock(&(nat->lock));
-	
+
 	struct sr_nat_connection *walker_conns = mapping->conns;
 	struct sr_nat_connection *prev_conn = NULL;
 	int found = 0;
@@ -334,7 +366,7 @@ int processNATConnection(struct sr_nat *nat, struct sr_nat_mapping * mapping,
         prev_conn = walker_conns;
         walker_conns = prev_conn->next;
     }
-	
+
 	if (!found){
 		if (tcp_flag == FLAG_SYN){
 			if (isClient){
@@ -349,7 +381,7 @@ int processNATConnection(struct sr_nat *nat, struct sr_nat_mapping * mapping,
 		if (updateNATConnection(walker_conns, tcp_flag, isClient))
 			timeout_nat_conn(walker_conns, prev_conn, mapping);
 	}
-  	
+
 	mapping->last_updated = time(NULL);
 	pthread_mutex_unlock(&(nat->lock));
 	return 0;
