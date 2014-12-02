@@ -95,20 +95,17 @@ void sr_handlepacket(struct sr_instance* sr,
 
  		printf("Time to live is %d\n", ip_buf->ip_ttl);
 	    if (validIPPacket(ip_buf)){
-
 			if (ip_buf->ip_ttl < 2) {
         		printf("ERROR: Time to live has expired\n");
  		       /*send ICMP Time exceeded (type 11, code 0)*/
 				buf = makeIcmp(buf, in_if, 11, 0);
 				sendPacket(sr, buf, interface, LEN_ICMP);
 			} else {
-
 				if (packetIsToSelf(sr, buf, 1)){
 					printf("IP packet is to self\n");
 					if (ip_buf->ip_p == ip_protocol_icmp) {
 						printf("IP protocol is ICMP\n");
 						struct sr_icmp_hdr * icmp_hdr = (struct sr_icmp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
-
                         /*check if packet is ICMP echo request (type 8) */
                         if (icmp_hdr->icmp_type == 8){
                             printf("ICMP protocol is echo request\n");
@@ -119,7 +116,6 @@ void sr_handlepacket(struct sr_instance* sr,
 								sendPacket(sr, buf, interface, len);
                     	    }
 						}
-
 					} else {
 					    printf("packet is to self and packet has TCP payload\n");
 						/*IP packet containing a UDP or TCP payload.
@@ -127,7 +123,6 @@ void sr_handlepacket(struct sr_instance* sr,
 						buf = makeIcmp(buf, in_if, 3, 3);
 						sendPacket(sr, buf, interface, LEN_ICMP);
 					}
-
 				} else {
                     if (sr->nat) {
                             printf("IP packet forward -NAT\n");
@@ -140,7 +135,6 @@ void sr_handlepacket(struct sr_instance* sr,
 		        }
 			}
 		}
-
 	} else if (ethertype(buf) == ethertype_arp){/*If the ethernet packet received is type ARP*/
         struct sr_arp_hdr *arp_buf = (struct sr_arp_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 		if (packetIsToSelf(sr, buf, 0)){
@@ -256,10 +250,10 @@ int get_ip_id(uint32_t ip_dst){
 			}
 			this = next;
 		}
-	next = malloc(sizeof(struct ip_id_used *));
-	next->ip_addr = ip_dst;
-	next->ip_id = 0;
-	this->next = next;
+		next = malloc(sizeof(struct ip_id_used *));
+		next->ip_addr = ip_dst;
+		next->ip_id = 0;
+		this->next = next;
 	}
 	return 0;
 }
@@ -273,7 +267,8 @@ void nat_processbuf(struct sr_instance* sr,
 	struct sr_nat_mapping *get_mapping = NULL;
 	struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 
-	struct sr_if* in_if = sr_get_interface(sr, interface);
+	struct sr_if* ext_if = sr_get_interface(sr, "eth2");
+	int isClient = 0;
 	printf("got -n flag sucessfully\n");
 
     if (ip_buf->ip_p == ip_protocol_tcp){
@@ -281,42 +276,54 @@ void nat_processbuf(struct sr_instance* sr,
         if (validateTCPChecksum(tcp_buf)){
             if (strcmp(interface, "eth1") == 0 ){
                 printf("nat TCP from client\n");
+				isClient = 1;
+				/*get NAT mapping, if not found, insert new mapping*/
                 get_mapping = sr_nat_lookup_internal(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
                 if (get_mapping == NULL) {
-                    get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
+                    get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, tcp_buf->src_port, ext_if->ip, nat_mapping_tcp);
                 }
-                tcp_buf->src_port = get_mapping->aux_ext;
-                ip_buf->ip_src = in_if->ip ;
-                prepIpFwd(ip_buf);
-                sendPacket(sr, buf, interface, len);
-                updateNATConnection(get_mapping, tcp_buf);
+				/*update connections of NAT mapping*/
+				if (processNATConnection(nat, get_mapping, ip_buf->ip_dst, tcp_buf->dest_port, tcp_buf->flags, isClient)){
+					/*packet is unsolicited inbound SYN*/
+				} else {
+					/*modify and foward TCP packet*/
+    	            tcp_buf->src_port = get_mapping->aux_ext;
+					tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf);
+            	    ip_buf->ip_src = get_mapping->ip_ext;
+                	prepIpFwd(ip_buf);
+        	        sendPacket(sr, buf, interface, len);
+				}
             } else if (strcmp(interface, "eth2") == 0 ){
                 printf("nat TCP from server\n");
 
                 get_mapping = sr_nat_lookup_external(nat, tcp_buf->dest_port, nat_mapping_tcp);
                 if (get_mapping == NULL) {
-
+                    get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_dst, tcp_buf->dest_port, ext_if->ip, nat_mapping_tcp);
                 }
-                tcp_buf->dest_port = get_mapping->aux_int;
-                ip_buf->ip_dst = get_mapping->ip_int;
-                prepIpFwd(ip_buf);
-                sendPacket(sr, buf, interface, len);
-                updateNATConnection(get_mapping, tcp_buf);
+				/*update connections of NAT mapping*/
+				if (processNATConnection(nat, get_mapping, ip_buf->ip_dst, tcp_buf->dest_port, tcp_buf->flags, isClient)){
+					/*packet is unsolicited inbound SYN*/
+				} else {
+   	             	tcp_buf->dest_port = get_mapping->aux_int;
+					tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf);
+    	            ip_buf->ip_dst = get_mapping->ip_int;
+        	        prepIpFwd(ip_buf);
+            	    sendPacket(sr, buf, interface, len);
+				}
             }  else {
-                printf("nat TCPfrom unrecognized interface\n");
+                printf("nat TCP from unrecognized interface\n");
             }
         }
-
     } else if (ip_buf->ip_p == ip_protocol_icmp) {
         printf("NAT protocol is ICMP\n");
         struct sr_icmp_hdr * icmp_hdr = (struct sr_icmp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
 
         /*check if packet is ICMP echo request (type 8) */
-        if (icmp_hdr->icmp_type == 8 || icmp_hdr->icmp_type == 0){
-            printf("NAT ICMP echo request or reply\n");
-            if (validateICMPChecksum(icmp_hdr, ICMP_ECHO_SIZE)){
-                printf("valid NAT ICMP echo request or reply\n");
-            }
+        if (validateICMPChecksum(icmp_hdr, ICMP_ECHO_SIZE)){
+            printf("valid NAT ICMP packet\n");
+        	if (icmp_hdr->icmp_type == 8 || icmp_hdr->icmp_type == 0){
+            	printf("NAT ICMP echo request or reply\n");
+        	}
         }
 
     }

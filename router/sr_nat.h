@@ -19,7 +19,12 @@ typedef enum {
   SYN_ACK,
   UN_SYN,
   CONN,
-  FIN,
+  FIN_C,
+  FIN_ACK_S,
+  FIN_S2,
+  FIN_S,
+  FIN_ACK_C,
+  FIN_C2,
   /* nat_mapping_udp, */
 } connection_state;
 
@@ -50,9 +55,9 @@ struct sr_nat_mapping {
 struct sr_nat {
   /* add any fields here */
   struct sr_nat_mapping *mappings;
-	int icmp_timeout;
-	int tcp_established;
-	int tcp_transitory;
+  int icmp_timeout;
+  int tcp_established;
+  int tcp_transitory;
 
   /* threading */
   pthread_mutex_t lock;
@@ -83,10 +88,16 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
 
 /* Insert a new mapping into the nat's mapping table.
    You must free the returned structure if it is not NULL. */
-struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
-  uint32_t ip_int, uint16_t aux_int, sr_nat_mapping_type type );
+struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat, uint32_t ip_int, 
+	uint16_t aux_int, uint32_t ip_ext, sr_nat_mapping_type type );
 
 
-void updateNATConnection(struct sr_nat_mapping *, struct sr_tcp_hdr *);
+int updateNATConnection(struct sr_nat_connection * find_conn, uint8_t tcp_flag, int isClient);
+void insertNATConnection(struct sr_nat_mapping * mapping, uint32_t ip_conn, 
+	uint16_t aux_conn, int conn_state);
+int processNATConnection(struct sr_nat *nat, struct sr_nat_mapping * mapping, uint32_t ip_conn, 
+	uint16_t aux_conn, uint8_t tcp_flag, int isClient);
 
+int rand_between(int min, int max);
+void init_ports();
 #endif

@@ -106,6 +106,11 @@ struct sr_tcp_hdr {
   uint32_t ack_num;
   uint8_t  data_offset;
   uint8_t  flags;
+#define	FLAG_FIN 0x0001
+#define	FLAG_SYN 0x0002
+#define	FLAG_ACK 0x0010
+#define	FLAG_SYN_ACK 0x0012
+#define	FLAG_FIN_ACK 0x0011
   uint16_t window_size;
   uint16_t tcp_sum;
   uint16_t urgent_p;
@@ -127,8 +132,6 @@ struct sr_icmp_t3_hdr {
 typedef struct sr_icmp_t3_hdr sr_icmp_t3_hdr_t;
 
 
-
-
 /*
  * Structure of an internet header, naked of options.
  */
@@ -141,7 +144,7 @@ struct sr_ip_hdr
     unsigned int ip_v:4;		/* version */
     unsigned int ip_hl:4;		/* header length */
 #else
-#error "Byte ordering ot specified "
+#error "Byte ordering not specified "
 #endif
     uint8_t ip_tos;			/* type of service */
     uint16_t ip_len;			/* total length */
