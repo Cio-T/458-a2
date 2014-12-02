@@ -109,7 +109,7 @@ void sr_handlepacket(struct sr_instance* sr,
                         /*check if packet is ICMP echo request (type 8) */
                         if (icmp_hdr->icmp_type == 8){
                             printf("ICMP protocol is echo request\n");
-                            if (validateICMPChecksum(icmp_hdr, ICMP_ECHO_SIZE)){
+                            if (validateICMPChecksum(icmp_hdr)){
                                 printf("ICMP echo request --isValid\n");
                     	        /*if yes, send back ICMP reply (type 0)*/
 								makeIcmpEchoReply(buf, in_if->ip);
@@ -328,7 +328,7 @@ void nat_processbuf(struct sr_instance* sr,
         struct sr_icmp_echo_hdr * icmp_buf = (struct sr_icmp_echo_hdr *)(buf + ETHE_SIZE + IP_SIZE);
 
         /*check if packet is ICMP echo request (type 8) */
-        if (validateICMPChecksum((struct sr_icmp_hdr *)icmp_buf, ICMP_ECHO_SIZE)){
+        if (validateICMPChecksum((struct sr_icmp_hdr *)icmp_buf)){
             printf("valid NAT ICMP packet\n");
         	if (icmp_buf->icmp_type == 8 || icmp_buf->icmp_type == 0){
             	printf("NAT ICMP echo request or reply\n");
@@ -343,7 +343,7 @@ void nat_processbuf(struct sr_instance* sr,
                     }
                     /*modify and foward icmp packet*/
                     icmp_buf->icmp_id = get_mapping->aux_ext;
-                    icmp_buf->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_hdr *)icmp_buf, ICMP_ECHO_SIZE);
+                    icmp_buf->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_hdr *)icmp_buf);
                     ip_buf->ip_src = get_mapping->ip_ext;
                     prepIpFwd(ip_buf);
                     sendPacket(sr, buf, in_if->ip, len);
@@ -360,7 +360,7 @@ void nat_processbuf(struct sr_instance* sr,
                         /*check if packet is ICMP echo request (type 8) */
                         if (icmp_buf->icmp_type == 8){
                             printf("nat ICMP protocol is echo request\n");
-                            if (validateICMPChecksum((struct sr_icmp_hdr *)icmp_buf, ICMP_ECHO_SIZE)){
+                            if (validateICMPChecksum((struct sr_icmp_hdr *)icmp_buf)){
                                 printf("nat ICMP echo request isValid\n");
                     	        /*if yes, send back ICMP reply (type 0)*/
 								makeIcmpEchoReply(buf, in_if->ip);

@@ -26,7 +26,7 @@ void makeIcmpEchoReply(uint8_t* buf, uint32_t outif_ip){
 
 	icmp_hdr->icmp_type = 0;
 	icmp_hdr->icmp_code = 0;
-	icmp_hdr->icmp_sum = calculate_ICMP_checksum(icmp_hdr, ICMP_ECHO_SIZE);
+	icmp_hdr->icmp_sum = calculate_ICMP_checksum(icmp_hdr);
 }
 
 uint8_t* makeIcmp(uint8_t* buf, uint32_t outif_ip, uint8_t icmp_type, uint8_t icmp_code){
@@ -56,15 +56,15 @@ uint8_t* makeIcmp(uint8_t* buf, uint32_t outif_ip, uint8_t icmp_type, uint8_t ic
 	icmp_hdr->icmp_type = icmp_type;
 	icmp_hdr->icmp_code = icmp_code;
 	memcpy(icmp_hdr->data, ip_hdr_buf, ICMP_DATA_SIZE);
-	icmp_hdr->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_hdr*)icmp_hdr, ICMP3_SIZE);
+	icmp_hdr->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_hdr*)icmp_hdr);
 
 	free(buf);
 	return new_pac;
 }
 
-int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int size){
-    uint16_t calc_sum = calculate_ICMP_checksum(icmp_hdr, size);
-    if (ntohs(icmp_hdr->icmp_sum) == calc_sum){
+int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr){
+    uint16_t calc_sum = calculate_ICMP_checksum(icmp_hdr);
+    if (icmp_hdr->icmp_sum == calc_sum){
         return 1;
     }
     printf("original ICMP sum is %d, and calculated ICMP sum is %d\n",

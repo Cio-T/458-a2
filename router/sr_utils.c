@@ -40,12 +40,13 @@ uint16_t calculate_TCP_checksum(struct sr_tcp_hdr * tcp_hdr) {
 	return ~(sum & 0xFFFF);
 }
 
-uint16_t calculate_ICMP3_checksum(struct sr_icmp_t3_hdr * icmp_hdr) {
+
+uint16_t calculate_ICMP_checksum(struct sr_icmp_hdr * icmp_hdr) {
 	uint32_t sum = 0;
 	uint16_t current_checksum = icmp_hdr->icmp_sum;
 	icmp_hdr->icmp_sum=0;
 	uint16_t* buffer = (uint16_t*) icmp_hdr;
-	int count = 10;
+	int count = 8;
 	while (count--) {
 		sum += *buffer++;
 		if (sum & 0xFFFF0000) {
@@ -57,56 +58,6 @@ uint16_t calculate_ICMP3_checksum(struct sr_icmp_t3_hdr * icmp_hdr) {
 	icmp_hdr->icmp_sum=current_checksum;
 	return ~(sum & 0xFFFF);
 }
-
-
-uint16_t calculate_ICMP_Echo_checksum(struct sr_icmp_echo_hdr * icmp_hdr) {
-	uint32_t sum = 0;
-	uint16_t current_checksum = icmp_hdr->icmp_sum;
-	icmp_hdr->icmp_sum=0;
-	uint16_t* buffer = (uint16_t*) icmp_hdr;
-	int count = 10;
-	while (count--) {
-		sum += *buffer++;
-		if (sum & 0xFFFF0000) {
-			/* carry occurred, so wrap around */
-			sum &= 0xFFFF;
-			sum++;
-		}
-	}
-	icmp_hdr->icmp_sum=current_checksum;
-	return ~(sum & 0xFFFF);
-}
-
-uint16_t calculate_ICMP_checksum(struct sr_icmp_hdr* icmp_hdr, int size) {
-    uint32_t sum = 0;
-    uint16_t current_checksum = icmp_hdr->icmp_sum;
-    icmp_hdr->icmp_sum = 0;
-    uint16_t* tmp = (uint16_t *) icmp_hdr;
-    int i;
-
-    for (i = 0; i < size/2; i++) sum = sum + tmp[i];
-
-    sum = (sum >> 16) + (sum & 0xFFFF);
-    sum = sum + (sum >> 16);
-
-    icmp_hdr->icmp_sum = current_checksum;
-    return ~sum;
-}
-
-uint16_t cksum (const void *_data, int len) {
-  const uint8_t *data = _data;
-  uint32_t sum;
-
-  for (sum = 0;len >= 2; data += 2, len -= 2)
-    sum += data[0] << 8 | data[1];
-  if (len > 0)
-    sum += data[0] << 8;
-  while (sum > 0xffff)
-    sum = (sum >> 16) + (sum & 0xffff);
-  sum = htons (~sum);
-  return sum ? sum : 0xffff;
-}
-
 
 uint16_t ethertype(uint8_t *buf) {
   sr_ethernet_hdr_t *ehdr = (sr_ethernet_hdr_t *)buf;

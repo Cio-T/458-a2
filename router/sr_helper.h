@@ -14,7 +14,7 @@ void makeAndSendArpReq(unsigned char* dest_mac_addr, uint32_t next_hop_ip,
 void makeIcmpEchoReply(uint8_t* buf, uint32_t outif_ip);
 uint8_t* makeIcmp(uint8_t* buf, uint32_t outif_ip, uint8_t icmp_type, uint8_t icmp_code);
 
-int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int size);
+int validateICMPChecksum(struct sr_icmp_hdr * icmp_buf);
 int validateTCPChecksum(struct sr_tcp_hdr * tcp_buf);
 
 /*
