@@ -16,12 +16,12 @@ void prepICMPEchoNat(struct sr_icmp_echo_hdr * icmp_buf){
     icmp_buf->icmp_sum = calculate_icmp_checksum(icmp_buf);
 }
 
-void makeIcmpEchoReply(uint8_t* buf, struct sr_if* out_if){
+void makeIcmpEchoReply(uint8_t* buf, uint32_t outif_ip){
 	struct sr_ip_hdr *ip_hdr = (struct sr_ip_hdr *)(buf + ETHE_SIZE);
 	struct sr_icmp_hdr * icmp_hdr = (struct sr_icmp_hdr*)(buf + ETHE_SIZE + IP_SIZE);
 
 	ip_hdr->ip_dst = ip_hdr->ip_src;
-	ip_hdr->ip_src = out_if->ip; /* source and destination address */
+	ip_hdr->ip_src = outif_ip; /* source and destination address */
 
 	ip_hdr->ip_ttl = 64;
 	ip_hdr->ip_off = 0;	/* fragment offset field */
@@ -33,7 +33,7 @@ void makeIcmpEchoReply(uint8_t* buf, struct sr_if* out_if){
 	icmp_hdr->icmp_sum = calculate_ICMP_checksum(icmp_hdr, ICMP_ECHO_SIZE);
 }
 
-uint8_t* makeIcmp(uint8_t* buf, struct sr_if* out_if, uint8_t icmp_type, uint8_t icmp_code){
+uint8_t* makeIcmp(uint8_t* buf, uint32_t outif_ip, uint8_t icmp_type, uint8_t icmp_code){
 	int len = LEN_ICMP;
 	uint8_t* new_pac = (uint8_t *)malloc(len);
 
@@ -44,7 +44,7 @@ uint8_t* makeIcmp(uint8_t* buf, struct sr_if* out_if, uint8_t icmp_type, uint8_t
 	struct sr_ip_hdr *ip_hdr_buf = (struct sr_ip_hdr *)(buf + ETHE_SIZE);
 
    	ip_hdr->ip_dst = ip_hdr_buf->ip_src;
-	ip_hdr->ip_src = out_if->ip; /* source and destination address */
+	ip_hdr->ip_src = outif_ip; /* source and destination address */
    	ip_hdr->ip_p = ip_protocol_icmp;	/* protocol */
    	ip_hdr->ip_hl = 5; /* header length */
 	ip_hdr->ip_v = 4; /*version*/

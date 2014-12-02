@@ -39,6 +39,7 @@ struct sr_nat_connection {
 
   int conn_state;
   struct sr_nat_connection *next;
+  uint8_t* buf;
 };
 
 struct sr_nat_mapping {
@@ -94,9 +95,9 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat, uint32_t ip_int
 
 
 int updateNATConnection(struct sr_nat_connection * find_conn, uint8_t tcp_flag, int isClient);
-void insertNATConnection(struct sr_nat_mapping * mapping, uint32_t ip_conn,
+void insertNATConnection(struct sr_nat_mapping * mapping, uint8_t* buf, uint32_t ip_conn,
 	uint16_t aux_conn, int conn_state);
-int processNATConnection(struct sr_nat *nat, struct sr_nat_mapping * mapping, uint32_t ip_conn,
+int processNATConnection(struct sr_nat *nat, uint8_t* buf, struct sr_nat_mapping * mapping, uint32_t ip_conn,
 	uint16_t aux_conn, uint8_t tcp_flag, int isClient);
 
 int rand_between(int min, int max);

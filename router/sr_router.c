@@ -98,8 +98,8 @@ void sr_handlepacket(struct sr_instance* sr,
 			if (ip_buf->ip_ttl < 2) {
         		printf("ERROR: Time to live has expired\n");
  		       /*send ICMP Time exceeded (type 11, code 0)*/
-				buf = makeIcmp(buf, in_if, 11, 0);
-				sendPacket(sr, buf, interface, LEN_ICMP);
+				buf = makeIcmp(buf, in_if->ip, 11, 0);
+				sendPacket(sr, buf, in_if->ip, LEN_ICMP);
 			} else {
 				if (packetIsToSelf(sr, buf, 1)){
 					printf("IP packet is to self\n");
@@ -112,16 +112,16 @@ void sr_handlepacket(struct sr_instance* sr,
                             if (validateICMPChecksum(icmp_hdr, ICMP_ECHO_SIZE)){
                                 printf("ICMP echo request --isValid\n");
                     	        /*if yes, send back ICMP reply (type 0)*/
-								makeIcmpEchoReply(buf, in_if);
-								sendPacket(sr, buf, interface, len);
+								makeIcmpEchoReply(buf, in_if->ip);
+								sendPacket(sr, buf, in_if->ip, len);
                     	    }
 						}
 					} else {
 					    printf("packet is to self and packet has TCP payload\n");
 						/*IP packet containing a UDP or TCP payload.
 						Send ICMP Port unreachable (type 3, code 3)*/
-						buf = makeIcmp(buf, in_if, 3, 3);
-						sendPacket(sr, buf, interface, LEN_ICMP);
+						buf = makeIcmp(buf, in_if->ip, 3, 3);
+						sendPacket(sr, buf, in_if->ip, LEN_ICMP);
 					}
 				} else {
                     if (sr->nat) {
@@ -130,7 +130,7 @@ void sr_handlepacket(struct sr_instance* sr,
                     } else {
                         printf("IP packet forward\n");
                             prepIpFwd(ip_buf);
-                            sendPacket(sr, buf, interface, len);
+                            sendPacket(sr, buf, in_if->ip, len);
                     }
 		        }
 			}
@@ -265,6 +265,8 @@ void nat_processbuf(struct sr_instance* sr,
 {
 	struct sr_nat * nat = sr->nat;
 	struct sr_nat_mapping *get_mapping = NULL;
+
+	struct sr_if* in_if = sr_get_interface(sr, interface);
 	struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
 
 	int isClient = 0;
@@ -290,7 +292,7 @@ void nat_processbuf(struct sr_instance* sr,
 					tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf);
             	    ip_buf->ip_src = get_mapping->ip_ext;
                 	prepIpFwd(ip_buf);
-        	        sendPacket(sr, buf, interface, len);
+        	        sendPacket(sr, buf, in_if->ip, len);
 				}
             } else if (strcmp(interface, "eth2") == 0 ){
                 printf("nat TCP from server\n");
@@ -300,14 +302,14 @@ void nat_processbuf(struct sr_instance* sr,
                     get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_dst, tcp_buf->dest_port, nat_mapping_tcp);
                 }
 				/*update connections of NAT mapping*/
-				if (processNATConnection(nat, get_mapping, ip_buf->ip_dst, tcp_buf->dest_port, tcp_buf->flags, isClient)){
+				if (processNATConnection(nat, buf, get_mapping, ip_buf->ip_src, tcp_buf->src_port, tcp_buf->flags, isClient)){
 					/*packet is unsolicited inbound SYN*/
 				} else {
    	             	tcp_buf->dest_port = get_mapping->aux_int;
 					tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf);
     	            ip_buf->ip_dst = get_mapping->ip_int;
         	        prepIpFwd(ip_buf);
-            	    sendPacket(sr, buf, interface, len);
+            	    sendPacket(sr, buf, in_if->ip, len);
 				}
             }  else {
                 printf("nat TCP from unrecognized interface\n");
@@ -331,27 +333,22 @@ void nat_processbuf(struct sr_instance* sr,
                     if (get_mapping == NULL) {
                         get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, icmp_buf->icmp_id, nat_mapping_icmp);
                     }
-
                     /*modify and foward icmp packet*/
                     icmp_buf->icmp_id = get_mapping->aux_ext;
-                    icmp_buf->icmp_sum = calculate_icmp_checksum(icmp_buf);
+                    icmp_buf->icmp_sum = calculate_icmp_checksum(icmp_buf, ICMP_ECHO_SIZE);
                     ip_buf->ip_src = get_mapping->ip_ext;
                     prepIpFwd(ip_buf);
-                    sendPacket(sr, buf, interface, len);
+                    sendPacket(sr, buf, in_if->ip, len);
 
                 } else if (strcmp(interface, "eth2") == 0 ){
                     printf("nat ICMP from server\n");
-
-                    get_mapping = sr_nat_lookup_external(nat, icmp_buf->dest_port, nat_mapping_icmp);
+                    get_mapping = sr_nat_lookup_external(nat, icmp_buf->icmp_id, nat_mapping_icmp);
                     if (get_mapping == NULL) {
-                        get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_dst, icmp_buf->dest_port, nat_mapping_icmp);
+                        get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_dst, icmp_buf->icmp_id, nat_mapping_icmp);
                     }
-
-                    icmp_buf->icmp_sum = calculate_icmp_checksum(icmp_buf);
                     ip_buf->ip_dst = get_mapping->ip_int;
                     prepIpFwd(ip_buf);
-                    sendPacket(sr, buf, interface, len);
-
+                    sendPacket(sr, buf, in_if->ip, len);
                 }  else {
                     printf("nat ICMP from unrecognized interface\n");
                 }
@@ -362,17 +359,16 @@ void nat_processbuf(struct sr_instance* sr,
 
 }
 
-void sendPacket(struct sr_instance* sr, uint8_t * buf, char * interface, unsigned int len){
+void sendPacket(struct sr_instance* sr, uint8_t * buf, uint32_t outif_ip, unsigned int len){
 
     struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
-	struct sr_if* in_if = sr_get_interface(sr, interface);
 
     struct sr_rt* best_rt_entry = getBestRtEntry(sr->routing_table, ip_buf);
 
     if (!best_rt_entry){/*no matching entry in routing table*/
         /*send ICMP Destination net unreachable (type 3, code 0)*/
-        buf = makeIcmp(buf, in_if, 3, 0);
-        sendPacket(sr, buf, interface, LEN_ICMP);
+        buf = makeIcmp(buf, outif_ip, 3, 0);
+        sendPacket(sr, buf, outif_ip, LEN_ICMP);
     }else{
         char* interface = best_rt_entry->interface;
         /*find next hop ip address based on longest prefix match entry in rtable*/

@@ -154,6 +154,8 @@ void free_walker_conns(struct sr_nat *nat ,
         free_conn = 0;
         if (walker_conns->conn_state == UN_SYN){
             if (difftime(curtime, walker->last_updated) > 6.0){
+                uint8_t * buf = makeIcmp(walker_conns->buf, nat->extif_ip, 3, 3);
+                sendPacket(sr, buf, nat->extif_ip, LEN_ICMP);
                 timeout_nat_conn(walker_conns, prev_conn, walker);
                 free_conn = 1;
             }
@@ -330,7 +332,7 @@ int updateNATConnection(struct sr_nat_connection * find_conn, uint8_t tcp_flag, 
 		return 0;
 }
 
-void insertNATConnection(struct sr_nat_mapping * mapping, uint32_t ip_conn,
+void insertNATConnection(struct sr_nat_mapping * mapping, uint8_t* buf, uint32_t ip_conn,
 	uint16_t aux_conn, int conn_state){
 
 	struct sr_nat_connection *new_conn = NULL;
@@ -347,9 +349,17 @@ void insertNATConnection(struct sr_nat_mapping * mapping, uint32_t ip_conn,
 		new_conn->next = NULL;
 		mapping->conns = new_conn;
 	}
+	new_conn->conn_state = conn_state;
+	new_conn->buf = NULL;
+	if (conn_state == UN_SYN){
+        struct sr_ip_hdr *ip_hdr_buf = (struct sr_ip_hdr *)(buf + ETHE_SIZE);
+        new_conn->buf = malloc(ICMP_DATA_SIZE);
+        memcpy(new_conn->buf, ip_hdr_buf, ICMP_DATA_SIZE);
+	}
+
 }
 
-int processNATConnection(struct sr_nat *nat, struct sr_nat_mapping * mapping,
+int processNATConnection(struct sr_nat *nat, uint8_t* buf, struct sr_nat_mapping * mapping,
 	uint32_t ip_conn, uint16_t aux_conn, uint8_t tcp_flag, int isClient){
 
 	pthread_mutex_lock(&(nat->lock));
