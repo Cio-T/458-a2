@@ -284,7 +284,7 @@ void nat_processbuf(struct sr_instance* sr,
                     get_mapping = sr_nat_insert_mapping(nat, ip_buf->ip_src, tcp_buf->src_port, nat_mapping_tcp);
                 }
 				/*update connections of NAT mapping*/
-				if (processNATConnection(nat, get_mapping, ip_buf->ip_dst, tcp_buf->dest_port, tcp_buf->flags, isClient)){
+				if (processNATConnection(nat, buf, get_mapping, ip_buf->ip_dst, tcp_buf->dest_port, tcp_buf->flags, isClient)){
 					/*packet is unsolicited inbound SYN*/
 				} else {
 					/*modify and foward TCP packet*/
@@ -320,7 +320,7 @@ void nat_processbuf(struct sr_instance* sr,
         struct sr_icmp_echo_hdr * icmp_buf = (struct sr_icmp_echo_hdr *)(buf + ETHE_SIZE + IP_SIZE);
 
         /*check if packet is ICMP echo request (type 8) */
-        if (validateICMPChecksum(icmp_buf, ICMP_ECHO_SIZE)){
+        if (validateICMPChecksum((struct sr_icmp_echo_hdr *)icmp_buf, ICMP_ECHO_SIZE)){
             printf("valid NAT ICMP packet\n");
         	if (icmp_buf->icmp_type == 8 || icmp_buf->icmp_type == 0){
             	printf("NAT ICMP echo request or reply\n");
@@ -335,7 +335,7 @@ void nat_processbuf(struct sr_instance* sr,
                     }
                     /*modify and foward icmp packet*/
                     icmp_buf->icmp_id = get_mapping->aux_ext;
-                    icmp_buf->icmp_sum = calculate_icmp_checksum(icmp_buf, ICMP_ECHO_SIZE);
+                    icmp_buf->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_echo_hdr *)icmp_buf, ICMP_ECHO_SIZE);
                     ip_buf->ip_src = get_mapping->ip_ext;
                     prepIpFwd(ip_buf);
                     sendPacket(sr, buf, in_if->ip, len);
