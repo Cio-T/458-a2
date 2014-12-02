@@ -26,7 +26,7 @@ void makeIcmpEchoReply(uint8_t* buf, struct sr_if* out_if){
 
 	icmp_hdr->icmp_type = 0;
 	icmp_hdr->icmp_code = 0;
-	icmp_hdr->icmp_sum = calculate_ICMP_checksum(icmp_hdr, ICMP_SIZE);
+	icmp_hdr->icmp_sum = calculate_ICMP_checksum(icmp_hdr, ICMP_ECHO_SIZE);
 }
 
 uint8_t* makeIcmp(uint8_t* buf, struct sr_if* out_if, uint8_t icmp_type, uint8_t icmp_code){
@@ -73,7 +73,7 @@ int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int size){
 }
 
 int validateTCPChecksum(struct sr_tcp_hdr * tcp_buf){
-    uint16_t calc_sum = calculate_IP_checksum(tcp_buf);
+    uint16_t calc_sum = calculate_TCP_checksum(tcp_buf);
     if (tcp_buf->tcp_sum == calc_sum){
         return 1;
     }

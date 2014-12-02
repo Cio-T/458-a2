@@ -30,6 +30,7 @@
 
 uint16_t cksum(const void *_data, int len);
 uint16_t calculate_IP_checksum(struct sr_ip_hdr* ip_buf);
+uint16_t calculate_TCP_checksum(struct sr_tcp_hdr * tcp_hdr);
 uint16_t calculate_ICMP_checksum(struct sr_icmp_hdr* icmp_hdr, int size);
 
 uint16_t ethertype(uint8_t *buf);

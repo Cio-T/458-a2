@@ -16,9 +16,10 @@ typedef enum {
 
 typedef enum {
   SYN,
+  SYN_ACK,
   UN_SYN,
-  ACK,
-  FIN
+  CONN,
+  FIN,
   /* nat_mapping_udp, */
 } connection_state;
 

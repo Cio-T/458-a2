@@ -112,7 +112,7 @@ void sr_handlepacket(struct sr_instance* sr,
                         /*check if packet is ICMP echo request (type 8) */
                         if (icmp_hdr->icmp_type == 8){
                             printf("ICMP protocol is echo request\n");
-                            if (validateICMPChecksum(icmp_hdr, ICMP_SIZE)){
+                            if (validateICMPChecksum(icmp_hdr, ICMP_ECHO_SIZE)){
                                 printf("ICMP echo request --isValid\n");
                     	        /*if yes, send back ICMP reply (type 0)*/
 								makeIcmpEchoReply(buf, in_if);
@@ -299,7 +299,7 @@ void nat_processbuf(struct sr_instance* sr,
             /*check if packet is ICMP echo request (type 8) */
             if (icmp_hdr->icmp_type == 8 || icmp_hdr->icmp_type == 0){
                 printf("NAT ICMP echo request or reply\n");
-                if (validateICMPChecksum(icmp_hdr, ICMP_SIZE)){
+                if (validateICMPChecksum(icmp_hdr, ICMP_ECHO_SIZE)){
                     printf("valid NAT ICMP echo request or reply\n");
                 }
             }

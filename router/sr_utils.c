@@ -22,6 +22,24 @@ uint16_t calculate_IP_checksum(struct sr_ip_hdr* ip_hdr) {
 	return ~(sum & 0xFFFF);
 }
 
+uint16_t calculate_TCP_checksum(struct sr_tcp_hdr * tcp_hdr) {
+	uint32_t sum = 0;
+	uint16_t current_checksum = tcp_hdr->tcp_sum;
+	tcp_hdr->tcp_sum=0;
+	uint16_t* buffer = (uint16_t*) tcp_hdr;
+	int count = 10;
+	while (count--) {
+		sum += *buffer++;
+		if (sum & 0xFFFF0000) {
+			/* carry occurred, so wrap around */
+			sum &= 0xFFFF;
+			sum++;
+		}
+	}
+	tcp_hdr->tcp_sum=current_checksum;
+	return ~(sum & 0xFFFF);
+}
+
 uint16_t calculate_ICMP_checksum(struct sr_icmp_hdr* icmp_hdr, int size) {
     uint32_t sum = 0;
     uint16_t current_checksum = icmp_hdr->icmp_sum;
