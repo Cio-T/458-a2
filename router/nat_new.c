@@ -9,21 +9,10 @@
 #include <unistd.h>
 
 int free_ports[64512];
-int icmp_id_counter = 1 ;
-
-void init_ports(){
-	int i;
-	for (i=0;i<64512;i++){
-		free_ports[i] = 1;
-	}
-}
-
-int rand_between(int min, int max) {
-    return rand() % (max - min + 1) + min;
-}
+int icmp_id_counter;
 
 int sr_nat_init(struct sr_instance* sr, int icmp_timeout, int tcp_established,
-         int tcp_transitory) { /* Initializes the nat */
+	 int tcp_transitory) { /* Initializes the nat */
 
 	struct sr_nat * nat;
 
@@ -45,14 +34,31 @@ int sr_nat_init(struct sr_instance* sr, int icmp_timeout, int tcp_established,
   pthread_attr_setdetachstate(&(nat->thread_attr), PTHREAD_CREATE_JOINABLE);
   pthread_attr_setscope(&(nat->thread_attr), PTHREAD_SCOPE_SYSTEM);
   pthread_attr_setscope(&(nat->thread_attr), PTHREAD_SCOPE_SYSTEM);
-  pthread_create(&(nat->thread), &(nat->thread_attr), sr_nat_timeout, sr);
+  pthread_create(&(nat->thread), &(nat->thread_attr), sr_nat_timeout, nat);
 
   /* CAREFUL MODIFYING CODE ABOVE THIS LINE! */
 
   nat->mappings = NULL;
   /* Initialize any variables here */
-  init_ports();
+  nat->icmp_timeout = icmp_timeout;
+  nat->tcp_established = tcp_established;
+  nat->tcp_transitory = tcp_transitory;
+  nat->extif_ip = sr_get_interface(sr, "eth2")->ip;
+
+  icmp_id_counter = 1;
+
   return success;
+}
+
+void init_ports(){
+	int i;
+	for (i=0;i<64512;i++){
+		free_ports[i] = 1;
+	}
+}
+
+int rand_between(int min, int max) {
+    return rand() % (max - min + 1) + min;
 }
 
 int sr_nat_destroy(struct sr_nat *nat) {  /* Destroys the nat (free memory) */
@@ -86,10 +92,8 @@ int sr_nat_destroy(struct sr_nat *nat) {  /* Destroys the nat (free memory) */
 
 }
 
-void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
-  
-  struct sr_instance* sr = (struct sr_instance*)sr_ptr;
-  struct sr_nat *nat = sr->nat;
+void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
+  struct sr_nat *nat = (struct sr_nat *)nat_ptr;
   while (1) {
     sleep(1.0);
     pthread_mutex_lock(&(nat->lock));
@@ -108,7 +112,7 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
                 free_walker = 1;
             }
         } else if (walker->type == nat_mapping_tcp){
-            free_walker_conns(sr, walker, curtime);
+            free_walker_conns(nat, walker, curtime);
             if (walker->conns == NULL){
                 free_nat_mapping(walker, prev_mapping, nat);
                 free_walker = 1;
@@ -117,6 +121,7 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
         prev_mapping = walker;
         if (free_walker){
             free(walker);
+			free_ports[walker->aux_ext - 1024] = 1;
         }
         walker = prev_mapping->next;
     }
@@ -137,11 +142,10 @@ void free_nat_mapping(struct sr_nat_mapping * mapping,
 
 }
 
-void free_walker_conns(struct sr_instance* sr,
+void free_walker_conns(struct sr_nat *nat ,
     struct sr_nat_mapping * walker,
     time_t curtime){
 
-    struct sr_nat *nat = sr->nat;
     struct sr_nat_connection *walker_conns = walker->conns;
     struct sr_nat_connection *prev_conn = NULL;
     int free_conn;
@@ -151,7 +155,6 @@ void free_walker_conns(struct sr_instance* sr,
         if (walker_conns->conn_state == UN_SYN){
             if (difftime(curtime, walker->last_updated) > 6.0){
                 uint8_t * buf = makeIcmp(walker_conns->buf, nat->extif_ip, 3, 3);
-                sendPacket(sr, buf, nat->extif_ip, LEN_ICMP);
                 timeout_nat_conn(walker_conns, prev_conn, walker);
                 free_conn = 1;
             }
