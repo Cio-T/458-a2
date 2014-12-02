@@ -64,7 +64,7 @@ uint8_t* makeIcmp(uint8_t* buf, uint32_t outif_ip, uint8_t icmp_type, uint8_t ic
 
 int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int size){
     uint16_t calc_sum = calculate_ICMP_checksum(icmp_hdr, size);
-    if (icmp_hdr->icmp_sum == calc_sum){
+    if (ntohs(icmp_hdr->icmp_sum) == calc_sum){
         return 1;
     }
     printf("original ICMP sum is %d, and calculated ICMP sum is %d\n",
