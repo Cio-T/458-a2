@@ -287,16 +287,11 @@ void nat_processbuf(struct sr_instance* sr,
     if (ip_buf->ip_p == ip_protocol_tcp){
         struct sr_tcp_hdr * tcp_buf = (struct sr_tcp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
 		int len_tcp = len - ETHE_SIZE - IP_SIZE;
-		
-		printf("TCP checksum calculated is %d\n", calculate_TCP_checksum(tcp_buf, len_tcp));
-		printf("ntohs TCP checksum calculated is %d\n", ntohs(calculate_TCP_checksum(tcp_buf, len_tcp)));
-		printf("htons TCP checksum calculated is %d\n", htons(calculate_TCP_checksum(tcp_buf, len_tcp)));
-		printf("TCP checksum2 calculated is %d\n", calculate_TCP_checksum2(tcp_buf));
-		printf("ntohs TCP checksum2 calculated is %d\n", ntohs(calculate_TCP_checksum2(tcp_buf)));
-		printf("htons TCP checksum2 calculated is %d\n", htons(calculate_TCP_checksum2(tcp_buf)));
-		printf("int count for IP checksum is %d\n", (int)(ip_buf->ip_hl* 2));
-		
-        if (validateTCPChecksum(tcp_buf, len)){
+
+		printf("TCP checksum calculated is %d\n", calculate_TCP_checksum(tcp_buf,
+                &ip_buf->ip_src, &ip_buf->ip_dst, len_tcp));
+
+        if (validateTCPChecksum(tcp_buf, &ip_buf->ip_src, &ip_buf->ip_dst, len_tcp)){
             if (strcmp(interface, "eth1") == 0 ){
                 printf("nat TCP from client\n");
 				isClient = 1;
@@ -310,10 +305,11 @@ void nat_processbuf(struct sr_instance* sr,
 					/*packet is unsolicited inbound SYN*/
 				} else {
 					/*modify and foward TCP packet*/
-    	            tcp_buf->src_port = get_mapping->aux_ext;
-					tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf, len_tcp);
-            	    ip_buf->ip_src = get_mapping->ip_ext;
+                    ip_buf->ip_src = get_mapping->ip_ext;
                 	prepIpFwd(ip_buf);
+    	            tcp_buf->src_port = get_mapping->aux_ext;
+					tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf, &ip_buf->ip_src, &ip_buf->ip_dst, len_tcp);
+
         	        sendPacket(sr, buf, in_if->ip, len);
 				}
             } else if (strcmp(interface, "eth2") == 0 ){
@@ -325,10 +321,10 @@ void nat_processbuf(struct sr_instance* sr,
                     if (processNATConnection(nat, buf, get_mapping, ip_buf->ip_src, tcp_buf->src_port, tcp_buf->flags, isClient)){
                         /*packet is unsolicited inbound SYN*/
                     } else {
-                        tcp_buf->dest_port = get_mapping->aux_int;
-                        tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf, len_tcp);
                         ip_buf->ip_dst = get_mapping->ip_int;
                         prepIpFwd(ip_buf);
+                        tcp_buf->dest_port = get_mapping->aux_int;
+                        tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf, &ip_buf->ip_src, &ip_buf->ip_dst, len_tcp);
                         sendPacket(sr, buf, in_if->ip, len);
                     }
                 } else if (ip_buf->ip_dst == in_if->ip){
@@ -344,7 +340,7 @@ void nat_processbuf(struct sr_instance* sr,
         printf("NAT protocol is ICMP\n");
         struct sr_icmp_echo_hdr * icmp_buf = (struct sr_icmp_echo_hdr *)(buf + ETHE_SIZE + IP_SIZE);
 		int len_icmp = len - ETHE_SIZE - IP_SIZE;
-		
+
         /*check if packet is ICMP echo request (type 8) */
         if (validateICMPChecksum((struct sr_icmp_hdr *)icmp_buf, len)){
         	if (icmp_buf->icmp_type == 8 || icmp_buf->icmp_type == 0){
