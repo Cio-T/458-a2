@@ -109,10 +109,10 @@ void sr_handlepacket(struct sr_instance* sr,
                         /*check if packet is ICMP echo request (type 8) */
                         if (icmp_hdr->icmp_type == 8){
                             printf("ICMP protocol is echo request\n");
-                            if (validateICMPChecksum(icmp_hdr)){
+                            if (validateICMPChecksum(icmp_hdr, len)){
                                 printf("ICMP echo request --isValid\n");
                     	        /*if yes, send back ICMP reply (type 0)*/
-								makeIcmpEchoReply(buf, in_if->ip);
+								makeIcmpEchoReply(buf, in_if->ip, len);
 								sendPacket(sr, buf, in_if->ip, len);
                     	    }
 						}
@@ -192,6 +192,8 @@ struct sr_rt* getBestRtEntry(struct sr_rt* routing_table, struct sr_ip_hdr *ip_b
     while (rt_walker && longest_prefix_count < 32){
         /*find longest bit match length*/
         cmp_entry = rt_walker->dest.s_addr & rt_walker->mask.s_addr;
+
+		printf("******current rt walker interface is %s\n", rt_walker->interface);
         while (count > longest_prefix_count){
             if ((cmp_entry ^ cmp_dest) == 0){
                 longest_prefix_count = count;
@@ -203,6 +205,7 @@ struct sr_rt* getBestRtEntry(struct sr_rt* routing_table, struct sr_ip_hdr *ip_b
             }
         }
         rt_walker = rt_walker->next;
+		cmp_dest = ip_buf->ip_dst;
         count = 32;
     }
     return best_rt_entry;
@@ -213,7 +216,6 @@ int packetIsToSelf(struct sr_instance* sr, uint8_t *buf, int isIP){
 	uint32_t int_ip = sr_get_interface(sr, "eth1")->ip;
 	uint32_t ext_ip = sr_get_interface(sr, "eth2")->ip;
 	uint32_t dest_ip;
-
 
 	if (isIP){
         struct sr_ip_hdr *ip_buf = (struct sr_ip_hdr *)(buf + sizeof(struct sr_ethernet_hdr));
@@ -269,6 +271,11 @@ void nat_processbuf(struct sr_instance* sr,
         char *interface)
 {
 	struct sr_nat * nat = sr->nat;
+	uint32_t ext_ip = sr_get_interface(sr, "eth2")->ip;
+	pthread_mutex_lock(&(nat->lock));
+	nat->extif_ip = ext_ip;
+	pthread_mutex_unlock(&(nat->lock));
+
 	struct sr_nat_mapping *get_mapping = NULL;
 
 	struct sr_if* in_if = sr_get_interface(sr, interface);
@@ -326,15 +333,13 @@ void nat_processbuf(struct sr_instance* sr,
     } else if (ip_buf->ip_p == ip_protocol_icmp) {
         printf("NAT protocol is ICMP\n");
         struct sr_icmp_echo_hdr * icmp_buf = (struct sr_icmp_echo_hdr *)(buf + ETHE_SIZE + IP_SIZE);
-
+		int len_icmp = len - ETHE_SIZE - IP_SIZE;
+		
         /*check if packet is ICMP echo request (type 8) */
-        if (validateICMPChecksum((struct sr_icmp_hdr *)icmp_buf)){
-            printf("valid NAT ICMP packet\n");
+        if (validateICMPChecksum((struct sr_icmp_hdr *)icmp_buf, len)){
         	if (icmp_buf->icmp_type == 8 || icmp_buf->icmp_type == 0){
-            	printf("NAT ICMP echo request or reply\n");
 
             	if (strcmp(interface, "eth1") == 0 ){
-                    printf("nat icmp from client\n");
                     isClient = 1;
                     /*get NAT mapping, if not found, insert new mapping*/
                     get_mapping = sr_nat_lookup_internal(nat, ip_buf->ip_src, icmp_buf->icmp_id, nat_mapping_icmp);
@@ -343,15 +348,16 @@ void nat_processbuf(struct sr_instance* sr,
                     }
                     /*modify and foward icmp packet*/
                     icmp_buf->icmp_id = get_mapping->aux_ext;
-                    icmp_buf->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_hdr *)icmp_buf);
+                    icmp_buf->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_hdr *)icmp_buf, len_icmp);
                     ip_buf->ip_src = get_mapping->ip_ext;
                     prepIpFwd(ip_buf);
                     sendPacket(sr, buf, in_if->ip, len);
 
                 } else if (strcmp(interface, "eth2") == 0 ){
-                    printf("nat ICMP from server\n");
                     get_mapping = sr_nat_lookup_external(nat, icmp_buf->icmp_id, nat_mapping_icmp);
                     if (get_mapping) {
+                    	icmp_buf->icmp_id = get_mapping->aux_int;
+               	     	icmp_buf->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_hdr *)icmp_buf, len_icmp);
                         ip_buf->ip_dst = get_mapping->ip_int;
                         prepIpFwd(ip_buf);
                         sendPacket(sr, buf, in_if->ip, len);
@@ -359,11 +365,9 @@ void nat_processbuf(struct sr_instance* sr,
                         /*treat as ICMP to self*/
                         /*check if packet is ICMP echo request (type 8) */
                         if (icmp_buf->icmp_type == 8){
-                            printf("nat ICMP protocol is echo request\n");
-                            if (validateICMPChecksum((struct sr_icmp_hdr *)icmp_buf)){
-                                printf("nat ICMP echo request isValid\n");
+                            if (validateICMPChecksum((struct sr_icmp_hdr *)icmp_buf, len)){
                     	        /*if yes, send back ICMP reply (type 0)*/
-								makeIcmpEchoReply(buf, in_if->ip);
+								makeIcmpEchoReply(buf, in_if->ip, len);
 								sendPacket(sr, buf, in_if->ip, len);
                     	    }
 						}
@@ -405,6 +409,7 @@ void sendPacket(struct sr_instance* sr, uint8_t * buf, uint32_t outif_ip, unsign
         } else {
             struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), next_hop_ip, buf,
                                                             len, interface);
+			printf("outgoing interface queued is %s\n", interface);
             sr_handle_arpreq(sr, req);
         }
 

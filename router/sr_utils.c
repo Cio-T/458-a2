@@ -41,7 +41,7 @@ uint16_t calculate_TCP_checksum(struct sr_tcp_hdr * tcp_hdr) {
 }
 
 
-uint16_t calculate_ICMP_checksum(struct sr_icmp_hdr * icmp_hdr) {
+uint16_t calculate_ICMP_Echo_checksum(struct sr_icmp_echo_hdr * icmp_hdr) {
 	uint32_t sum = 0;
 	uint16_t current_checksum = icmp_hdr->icmp_sum;
 	icmp_hdr->icmp_sum=0;
@@ -57,6 +57,22 @@ uint16_t calculate_ICMP_checksum(struct sr_icmp_hdr * icmp_hdr) {
 	}
 	icmp_hdr->icmp_sum=current_checksum;
 	return ~(sum & 0xFFFF);
+}
+
+uint16_t calculate_ICMP_checksum(struct sr_icmp_hdr* icmp_hdr, int size) {
+    uint32_t sum = 0;
+    uint16_t current_checksum = icmp_hdr->icmp_sum;
+    icmp_hdr->icmp_sum = 0;
+    uint16_t* tmp = (uint16_t *) icmp_hdr;
+    int i;
+
+    for (i = 0; i < size/2; i++) sum = sum + tmp[i];
+
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum = sum + (sum >> 16);
+
+    icmp_hdr->icmp_sum = current_checksum;
+    return ~sum;
 }
 
 uint16_t ethertype(uint8_t *buf) {

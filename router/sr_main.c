@@ -177,11 +177,12 @@ int main(int argc, char **argv)
       sr_load_rt_wrap(&sr, rtable);
     }
 
-	if (is_nat){
-		sr_nat_init(&sr, icmp_timeout, tcp_established, tcp_transitory);
-	}
     /* call router init (for arp subsystem etc.) */
     sr_init(&sr);
+
+    if (is_nat){
+	sr_nat_init(&sr, icmp_timeout, tcp_established, tcp_transitory);
+    }
 
     /* -- whizbang main loop ;-) */
     while( sr_read_from_server(&sr) == 1);

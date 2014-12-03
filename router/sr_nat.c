@@ -51,6 +51,9 @@ int sr_nat_init(struct sr_instance* sr, int icmp_timeout, int tcp_established,
 
   nat->mappings = NULL;
   /* Initialize any variables here */
+  nat->icmp_timeout = icmp_timeout;
+  nat->tcp_established = tcp_established;
+  nat->tcp_transitory = tcp_transitory;
   init_ports();
   return success;
 }
@@ -104,6 +107,7 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
         free_walker = 0;
         if (walker->type == nat_mapping_icmp){
             if (difftime(curtime, walker->last_updated) > nat->icmp_timeout){
+				printf("Icmp Query Timeout: %d\n", nat->icmp_timeout);
                 free_nat_mapping(walker, prev_mapping, nat);
                 free_walker = 1;
             }
@@ -150,6 +154,7 @@ void free_walker_conns(struct sr_instance* sr,
         free_conn = 0;
         if (walker_conns->conn_state == UN_SYN){
             if (difftime(curtime, walker->last_updated) > 6.0){
+				printf("Unsolicited SYN timeout\n");
                 uint8_t * buf = makeIcmp(walker_conns->buf, nat->extif_ip, 3, 3);
                 sendPacket(sr, buf, nat->extif_ip, LEN_ICMP);
                 timeout_nat_conn(walker_conns, prev_conn, walker);
@@ -157,11 +162,13 @@ void free_walker_conns(struct sr_instance* sr,
             }
         }else if (walker_conns->conn_state == SYN){
             if (difftime(curtime, walker->last_updated) > nat->tcp_transitory){
+				printf("TCP Transitory Idle Timeout: %d\n", nat->tcp_transitory);
                 timeout_nat_conn(walker_conns, prev_conn, walker);
                 free_conn = 1;
             }
         }else{
             if (difftime(curtime, walker->last_updated) > nat->tcp_established){
+				printf("TCP Established Idle Timeout: %d\n", nat->tcp_established);
                 timeout_nat_conn(walker_conns, prev_conn, walker);
                 free_conn = 1;
             }
@@ -218,7 +225,9 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
   struct sr_nat_mapping *walker = nat->mappings;
 
   while (walker){
+	
     if (walker->type == type && walker->ip_int == ip_int && walker->aux_int == aux_int){
+  		walker->last_updated = time(NULL);
         break;
     }
     walker = walker->next;

@@ -12,9 +12,11 @@
 #include "sr_utils.h"
 #include "sr_helper.h"
 
-void makeIcmpEchoReply(uint8_t* buf, uint32_t outif_ip){
+void makeIcmpEchoReply(uint8_t* buf, uint32_t outif_ip, int len){
 	struct sr_ip_hdr *ip_hdr = (struct sr_ip_hdr *)(buf + ETHE_SIZE);
 	struct sr_icmp_hdr * icmp_hdr = (struct sr_icmp_hdr*)(buf + ETHE_SIZE + IP_SIZE);
+    	
+	int size = len - ETHE_SIZE - IP_SIZE;
 
 	ip_hdr->ip_dst = ip_hdr->ip_src;
 	ip_hdr->ip_src = outif_ip; /* source and destination address */
@@ -26,7 +28,7 @@ void makeIcmpEchoReply(uint8_t* buf, uint32_t outif_ip){
 
 	icmp_hdr->icmp_type = 0;
 	icmp_hdr->icmp_code = 0;
-	icmp_hdr->icmp_sum = calculate_ICMP_checksum(icmp_hdr);
+	icmp_hdr->icmp_sum = calculate_ICMP_checksum(icmp_hdr, size);
 }
 
 uint8_t* makeIcmp(uint8_t* buf, uint32_t outif_ip, uint8_t icmp_type, uint8_t icmp_code){
@@ -56,14 +58,15 @@ uint8_t* makeIcmp(uint8_t* buf, uint32_t outif_ip, uint8_t icmp_type, uint8_t ic
 	icmp_hdr->icmp_type = icmp_type;
 	icmp_hdr->icmp_code = icmp_code;
 	memcpy(icmp_hdr->data, ip_hdr_buf, ICMP_DATA_SIZE);
-	icmp_hdr->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_hdr*)icmp_hdr);
+	icmp_hdr->icmp_sum = calculate_ICMP_checksum((struct sr_icmp_hdr*)icmp_hdr, ICMP3_SIZE);
 
 	free(buf);
 	return new_pac;
 }
 
-int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr){
-    uint16_t calc_sum = calculate_ICMP_checksum(icmp_hdr);
+int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int len){
+    int size = len - ETHE_SIZE - IP_SIZE;
+    uint16_t calc_sum = calculate_ICMP_checksum(icmp_hdr, size);
     if (icmp_hdr->icmp_sum == calc_sum){
         return 1;
     }
