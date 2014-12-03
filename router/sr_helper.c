@@ -75,13 +75,13 @@ int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int len){
     return 0;
 }
 
-int validateTCPChecksum(struct sr_tcp_hdr * tcp_buf){
-    uint16_t calc_sum = calculate_TCP_checksum(tcp_buf);
-    if (tcp_buf->tcp_sum == calc_sum){
+int validateTCPChecksum(struct sr_tcp_hdr* tcp_hdr, int size){
+    uint16_t calc_sum = calculate_TCP_checksum(tcp_hdr, size);
+    if (tcp_hdr->tcp_sum == calc_sum){
         return 1;
     }
     printf("original TCP sum is %d, and calculated TCP sum is %d\n",
-           tcp_buf->tcp_sum, calc_sum);
+           tcp_hdr->tcp_sum, calc_sum);
     return 0;
 }
 

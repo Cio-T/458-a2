@@ -286,7 +286,17 @@ void nat_processbuf(struct sr_instance* sr,
 
     if (ip_buf->ip_p == ip_protocol_tcp){
         struct sr_tcp_hdr * tcp_buf = (struct sr_tcp_hdr *)(buf + ETHE_SIZE + IP_SIZE);
-        if (validateTCPChecksum(tcp_buf)){
+		int len_tcp = len - ETHE_SIZE - IP_SIZE;
+		
+		printf("TCP checksum calculated is %d\n", calculate_TCP_checksum(tcp_buf, len_tcp));
+		printf("ntohs TCP checksum calculated is %d\n", ntohs(calculate_TCP_checksum(tcp_buf, len_tcp)));
+		printf("htons TCP checksum calculated is %d\n", htons(calculate_TCP_checksum(tcp_buf, len_tcp)));
+		printf("TCP checksum2 calculated is %d\n", calculate_TCP_checksum2(tcp_buf));
+		printf("ntohs TCP checksum2 calculated is %d\n", ntohs(calculate_TCP_checksum2(tcp_buf)));
+		printf("htons TCP checksum2 calculated is %d\n", htons(calculate_TCP_checksum2(tcp_buf)));
+		printf("int count for IP checksum is %d\n", (int)(ip_buf->ip_hl* 2));
+		
+        if (validateTCPChecksum(tcp_buf, len)){
             if (strcmp(interface, "eth1") == 0 ){
                 printf("nat TCP from client\n");
 				isClient = 1;
@@ -301,7 +311,7 @@ void nat_processbuf(struct sr_instance* sr,
 				} else {
 					/*modify and foward TCP packet*/
     	            tcp_buf->src_port = get_mapping->aux_ext;
-					tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf);
+					tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf, len_tcp);
             	    ip_buf->ip_src = get_mapping->ip_ext;
                 	prepIpFwd(ip_buf);
         	        sendPacket(sr, buf, in_if->ip, len);
@@ -316,7 +326,7 @@ void nat_processbuf(struct sr_instance* sr,
                         /*packet is unsolicited inbound SYN*/
                     } else {
                         tcp_buf->dest_port = get_mapping->aux_int;
-                        tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf);
+                        tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf, len_tcp);
                         ip_buf->ip_dst = get_mapping->ip_int;
                         prepIpFwd(ip_buf);
                         sendPacket(sr, buf, in_if->ip, len);

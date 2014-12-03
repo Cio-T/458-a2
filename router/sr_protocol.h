@@ -131,6 +131,12 @@ struct sr_tcp_hdr {
 } __attribute__ ((packed)) ;
 typedef struct sr_tcp_hdr sr_tcp_hdr_t;
 
+struct tcp_cksum_hdr {
+  uint32_t ip_src, ip_dst;	/* source and dest ip address */
+  uint8_t reserved;
+  uint8_t ip_p;
+  uint16_t tcp_len;
+} __attribute__ ((packed)) ;
 
 /*
  * Structure of an internet header, naked of options.
