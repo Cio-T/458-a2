@@ -15,7 +15,7 @@
 void makeIcmpEchoReply(uint8_t* buf, uint32_t outif_ip, int len){
 	struct sr_ip_hdr *ip_hdr = (struct sr_ip_hdr *)(buf + ETHE_SIZE);
 	struct sr_icmp_hdr * icmp_hdr = (struct sr_icmp_hdr*)(buf + ETHE_SIZE + IP_SIZE);
-    	
+
 	int size = len - ETHE_SIZE - IP_SIZE;
 
 	ip_hdr->ip_dst = ip_hdr->ip_src;
@@ -75,8 +75,10 @@ int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int len){
     return 0;
 }
 
-int validateTCPChecksum(struct sr_tcp_hdr* tcp_hdr, int size){
-    uint16_t calc_sum = calculate_TCP_checksum(tcp_hdr, size);
+int validateTCPChecksum(struct sr_tcp_hdr* tcp_hdr, uint16_t *ip_src_ptr, uint16_t *ip_dst_ptr,
+    int size)
+{
+    uint16_t calc_sum = calculate_TCP_checksum(tcp_hdr, ip_src_ptr, ip_dst_ptr, size);
     if (tcp_hdr->tcp_sum == calc_sum){
         return 1;
     }

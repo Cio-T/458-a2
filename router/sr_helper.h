@@ -15,7 +15,8 @@ void makeIcmpEchoReply(uint8_t* buf, uint32_t outif_ip, int len);
 uint8_t* makeIcmp(uint8_t* buf, uint32_t outif_ip, uint8_t icmp_type, uint8_t icmp_code);
 
 int validateICMPChecksum(struct sr_icmp_hdr * icmp_buf, int len);
-int validateTCPChecksum(struct sr_tcp_hdr * tcp_buf, int size);
+int validateTCPChecksum(struct sr_tcp_hdr * tcp_buf, uint16_t *ip_src_ptr, uint16_t *ip_dst_ptr,
+    int size);
 
 /*
 enum pac_len {
