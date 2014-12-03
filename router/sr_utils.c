@@ -3,6 +3,7 @@
 #include <string.h>
 #include "sr_protocol.h"
 #include "sr_utils.h"
+#include "sr_helper.h"
 
 /*function obtained from internet*/
 uint16_t calculate_IP_checksum(struct sr_ip_hdr* ip_hdr) {
@@ -32,7 +33,7 @@ uint16_t calculate_TCP_checksum(struct sr_tcp_hdr* tcp_hdr,
     uint16_t current_checksum = tcp_hdr->tcp_sum;
     tcp_hdr->tcp_sum = 0;
 
-    uint16_t *ip_src_ptr=(void *)&ip_stc;
+    uint16_t *ip_src_ptr=(void *)&ip_src;
     uint16_t *ip_dst_ptr=(void *)&ip_dst;
 
     uint16_t *buf = (uint16_t *) tcp_hdr;
@@ -47,10 +48,8 @@ uint16_t calculate_TCP_checksum(struct sr_tcp_hdr* tcp_hdr,
     }
 
     if ( len & 1 )
-    // Add the padding if the packet lenght is odd          //
         sum += *((uint8_t *)buf);
 
-    // Add the pseudo-header                                        //
     sum += *(ip_src_ptr++);
     sum += *ip_src_ptr;
     sum += *(ip_dst_ptr++);
@@ -58,50 +57,12 @@ uint16_t calculate_TCP_checksum(struct sr_tcp_hdr* tcp_hdr,
     sum += htons(ip_protocol_tcp);
     sum += htons(size);
 
-    // Add the carries                                              //
     while (sum >> 16)
         sum = (sum & 0xFFFF) + (sum >> 16);
-    // Return the one's complement of sum
 
     tcp_hdr->tcp_sum = current_checksum;
     return ~sum;
 }
-
-/*function obtained from internet*/
-uint16_t tcp_checksum(const void *buff, size_t len, in_addr_t src_addr, in_addr_t dest_addr)
- {
-    const uint16_t *buf=buff;
-    uint16_t *ip_src=(void *)&src_addr, *ip_dst=(void *)&dest_addr;
-    uint32_t sum;
-    size_t length=len;
-
-    // Calculate the sum                                            //
-    sum = 0;
-    while (len > 1){
-        sum += *buf++;
-        if (sum & 0x80000000)
-            sum = (sum & 0xFFFF) + (sum >> 16);
-        len -= 2;
-    }
-
-    if ( len & 1 )
-    // Add the padding if the packet lenght is odd          //
-        sum += *((uint8_t *)buf);
-
-    // Add the pseudo-header                                        //
-    sum += *(ip_src++);
-    sum += *ip_src;
-    sum += *(ip_dst++);
-    sum += *ip_dst;
-    sum += htons(IPPROTO_TCP);
-    sum += htons(length);
-
-    // Add the carries                                              //
-    while (sum >> 16)
-        sum = (sum & 0xFFFF) + (sum >> 16);
-    // Return the one's complement of sum                           //
-    return ( (uint16_t)(~sum)  );
- }
 
 int validateTCPChecksum(struct sr_tcp_hdr* tcp_hdr, uint32_t ip_src, uint32_t ip_dst,
     int size)
