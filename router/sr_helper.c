@@ -64,29 +64,6 @@ uint8_t* makeIcmp(uint8_t* buf, uint32_t outif_ip, uint8_t icmp_type, uint8_t ic
 	return new_pac;
 }
 
-int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int len){
-    int size = len - ETHE_SIZE - IP_SIZE;
-    uint16_t calc_sum = calculate_ICMP_checksum(icmp_hdr, size);
-    if (icmp_hdr->icmp_sum == calc_sum){
-        return 1;
-    }
-    printf("original ICMP sum is %d, and calculated ICMP sum is %d\n",
-           icmp_hdr->icmp_sum, calc_sum);
-    return 0;
-}
-
-int validateTCPChecksum(struct sr_tcp_hdr* tcp_hdr, uint16_t *ip_src_ptr, uint16_t *ip_dst_ptr,
-    int size)
-{
-    uint16_t calc_sum = calculate_TCP_checksum(tcp_hdr, ip_src_ptr, ip_dst_ptr, size);
-    if (tcp_hdr->tcp_sum == calc_sum){
-        return 1;
-    }
-    printf("original TCP sum is %d, and calculated TCP sum is %d\n",
-           tcp_hdr->tcp_sum, calc_sum);
-    return 0;
-}
-
 void prepIpFwd(struct sr_ip_hdr *ip_buf){
 	/*calculate the new ttl and checksum field of ip packet*/
 	--ip_buf->ip_ttl;

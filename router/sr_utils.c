@@ -26,11 +26,14 @@ uint16_t calculate_IP_checksum(struct sr_ip_hdr* ip_hdr) {
 
 /*function obtained from internet*/
 uint16_t calculate_TCP_checksum(struct sr_tcp_hdr* tcp_hdr,
-    uint16_t *ip_src_ptr, uint16_t *ip_dst_ptr, int size)
+    uint32_t ip_src, uint32_t ip_dst, int size)
 {
     uint32_t sum = 0;
     uint16_t current_checksum = tcp_hdr->tcp_sum;
     tcp_hdr->tcp_sum = 0;
+
+    uint16_t *ip_src_ptr=(void *)&ip_stc;
+    uint16_t *ip_dst_ptr=(void *)&ip_dst;
 
     uint16_t *buf = (uint16_t *) tcp_hdr;
     int len = size;
@@ -100,6 +103,18 @@ uint16_t tcp_checksum(const void *buff, size_t len, in_addr_t src_addr, in_addr_
     return ( (uint16_t)(~sum)  );
  }
 
+int validateTCPChecksum(struct sr_tcp_hdr* tcp_hdr, uint32_t ip_src, uint32_t ip_dst,
+    int size)
+{
+    uint16_t calc_sum = calculate_TCP_checksum(tcp_hdr, ip_src, ip_dst, size);
+    if (tcp_hdr->tcp_sum == calc_sum){
+        return 1;
+    }
+    printf("original TCP sum is %d, and calculated TCP sum is %d\n",
+           tcp_hdr->tcp_sum, calc_sum);
+    return 0;
+}
+
 /*function obtained from internet*/
 uint16_t calculate_ICMP_checksum(struct sr_icmp_hdr* icmp_hdr, int size) {
     uint32_t sum = 0;
@@ -115,6 +130,18 @@ uint16_t calculate_ICMP_checksum(struct sr_icmp_hdr* icmp_hdr, int size) {
 
     icmp_hdr->icmp_sum = current_checksum;
     return ~sum;
+}
+
+
+int validateICMPChecksum(struct sr_icmp_hdr* icmp_hdr, int len){
+    int size = len - ETHE_SIZE - IP_SIZE;
+    uint16_t calc_sum = calculate_ICMP_checksum(icmp_hdr, size);
+    if (icmp_hdr->icmp_sum == calc_sum){
+        return 1;
+    }
+    printf("original ICMP sum is %d, and calculated ICMP sum is %d\n",
+           icmp_hdr->icmp_sum, calc_sum);
+    return 0;
 }
 
 uint16_t ethertype(uint8_t *buf) {

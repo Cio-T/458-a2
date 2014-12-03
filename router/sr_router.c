@@ -289,9 +289,9 @@ void nat_processbuf(struct sr_instance* sr,
 		int len_tcp = len - ETHE_SIZE - IP_SIZE;
 
 		printf("TCP checksum calculated is %d\n", calculate_TCP_checksum(tcp_buf,
-                &ip_buf->ip_src, &ip_buf->ip_dst, len_tcp));
+                ip_buf->ip_src, ip_buf->ip_dst, len_tcp));
 
-        if (validateTCPChecksum(tcp_buf, &ip_buf->ip_src, &ip_buf->ip_dst, len_tcp)){
+        if (validateTCPChecksum(tcp_buf, ip_buf->ip_src, ip_buf->ip_dst, len_tcp)){
             if (strcmp(interface, "eth1") == 0 ){
                 printf("nat TCP from client\n");
 				isClient = 1;
@@ -308,7 +308,7 @@ void nat_processbuf(struct sr_instance* sr,
                     ip_buf->ip_src = get_mapping->ip_ext;
                 	prepIpFwd(ip_buf);
     	            tcp_buf->src_port = get_mapping->aux_ext;
-					tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf, &ip_buf->ip_src, &ip_buf->ip_dst, len_tcp);
+					tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf, ip_buf->ip_src, ip_buf->ip_dst, len_tcp);
 
         	        sendPacket(sr, buf, in_if->ip, len);
 				}
@@ -324,7 +324,7 @@ void nat_processbuf(struct sr_instance* sr,
                         ip_buf->ip_dst = get_mapping->ip_int;
                         prepIpFwd(ip_buf);
                         tcp_buf->dest_port = get_mapping->aux_int;
-                        tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf, &ip_buf->ip_src, &ip_buf->ip_dst, len_tcp);
+                        tcp_buf->tcp_sum = calculate_TCP_checksum(tcp_buf, ip_buf->ip_src, ip_buf->ip_dst, len_tcp);
                         sendPacket(sr, buf, in_if->ip, len);
                     }
                 } else if (ip_buf->ip_dst == in_if->ip){
